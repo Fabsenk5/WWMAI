@@ -21,7 +21,8 @@ CREATE TABLE games (
     user_count INTEGER NOT NULL DEFAULT 0, -- Add user_count column to the games table
     lives INT DEFAULT 3, -- Team shared lives
     jokers_used TEXT[] DEFAULT '{}', -- Track used jokers
-    game_mode VARCHAR(20) DEFAULT 'cooperative' -- 'cooperative' or 'survival'
+    game_mode VARCHAR(20) DEFAULT 'cooperative', -- 'cooperative' or 'survival'
+    selected_categories TEXT[] -- Categories selected for the game
 );
 
 CREATE TABLE players (

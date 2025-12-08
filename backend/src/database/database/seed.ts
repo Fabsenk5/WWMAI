@@ -149,9 +149,28 @@ async function seedGames() {
     console.log('Games and associated questions seeded successfully.');
 }
 
+async function ensureSchemaUpdates() {
+    console.log('Verifying schema updates...');
+    try {
+        // Migration: Add selected_categories to games if it doesn't exist
+        await pool.query('ALTER TABLE games ADD COLUMN IF NOT EXISTS selected_categories TEXT[]');
+        console.log('Schema verified/updated: games.selected_categories checked.');
+    } catch (err: any) {
+        // Ignore "relation does not exist" error, as verify/seed logic will handle creation
+        if (err.code === '42P01' || err.message.includes('does not exist')) {
+            console.log('Skipping schema update because tables do not exist yet.');
+        } else {
+            console.warn('Error verifying schema updates:', err);
+        }
+    }
+}
+
 export async function checkAndSeedDatabase() {
     console.log('Checking database status...');
     try {
+        // Run migrations first (in case table exists but is old)
+        await ensureSchemaUpdates();
+
         // Try to access the questions table
         const result = await pool.query('SELECT 1 FROM questions LIMIT 1');
 
