@@ -1,11 +1,22 @@
 import { Pool } from 'pg';
+import * as fs from 'fs';
+import * as path from 'path';
+import dotenv from 'dotenv'; // Ensure dotenv is used if not running via -r dotenv/config
+
+dotenv.config();
 
 const isDocker = process.env.DB_HOST === 'db';
 const dbHost = isDocker ? 'db' : 'localhost';
-const dbConnectionString = `postgresql://your_username:your_password@${dbHost}:5432/wer_wird_millionaer`;
 
-// Update pool initialization to use dbConnectionString
-const pool = new Pool({ connectionString: dbConnectionString });
+// Use DATABASE_URL if available (Render), otherwise construct it
+const dbConnectionString = process.env.DATABASE_URL || `postgresql://${process.env.DB_USER || 'your_username'}:${process.env.DB_PASSWORD || 'your_password'}@${dbHost}:5432/${process.env.DB_NAME || 'wer_wird_millionaer'}`;
+
+// Update pool initialization - enable SSL for production/Render
+const isProduction = process.env.NODE_ENV === 'production';
+const pool = new Pool({
+    connectionString: dbConnectionString,
+    ssl: isProduction ? { rejectUnauthorized: false } : false
+});
 
 const questions = [
     // Easy questions
@@ -49,6 +60,27 @@ const rooms = [
     { last_activity: new Date(Date.now() - 10 * 60 * 1000) }, // 10 minutes ago
     { last_activity: new Date(Date.now() - 2 * 60 * 1000) },  // 2 minutes ago
 ];
+
+async function createTables() {
+    console.log('Creating tables from schema.sql...');
+    try {
+        // Resolve path to schema.sql. 
+        // Assuming running from backend root: ./database/schema.sql
+        const schemaPath = path.join(process.cwd(), 'database', 'schema.sql');
+        console.log(`Reading schema from: ${schemaPath}`);
+
+        if (!fs.existsSync(schemaPath)) {
+            throw new Error(`Schema file not found at ${schemaPath}`);
+        }
+
+        const schemaSql = fs.readFileSync(schemaPath, 'utf8');
+        await pool.query(schemaSql);
+        console.log('Tables created successfully.');
+    } catch (error) {
+        console.error('Error creating tables:', error);
+        throw error;
+    }
+}
 
 async function seedQuestions() {
     console.log('Seeding questions...');
@@ -133,16 +165,19 @@ async function seedDatabase() {
         console.log('Database connection successful!');
         client.release();
 
+        await createTables();
+
         await seedQuestions();
         await verifyQuestions();
         await seedRooms();
-        await seedGames(); // Add the new seedGames function here
+        await seedGames();
 
         console.log('Database seeding completed successfully.');
     } catch (error) {
         console.error('Error during database seeding:', error);
     } finally {
         console.log('Database seeding script finished. Pool will close when process exits.');
+        await pool.end(); // Close pool properly
     }
 }
 
