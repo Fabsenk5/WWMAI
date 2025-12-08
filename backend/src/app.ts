@@ -24,8 +24,12 @@ app.use(cors({
     credentials: true
 }));
 
+import { checkAndSeedDatabase } from './database/database/seed';
+
 // Database connection
-connectWithRetry();
+connectWithRetry().then(() => {
+    checkAndSeedDatabase();
+});
 
 // Set up routes
 // setRoutes(app); // Moved after io initialization
