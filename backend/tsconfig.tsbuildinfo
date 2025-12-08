@@ -1,0 +1,1 @@
+{"root":["./src/app.ts","./src/controllers/gamecontroller.ts","./src/database/db.ts","./src/models/questionmodel.ts","./src/routes/gameroutes.ts"],"version":"5.8.3"}

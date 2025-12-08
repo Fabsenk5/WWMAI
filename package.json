@@ -1,0 +1,33 @@
+{
+  "devDependencies": {
+    "@types/body-parser": "^1.19.5",
+    "@types/cors": "^2.8.17",
+    "@types/dotenv": "^6.1.1",
+    "@types/express": "^5.0.1",
+    "@types/jest": "^29.5.14",
+    "@types/pg": "^8.11.14",
+    "@types/react": "^18.3.20",
+    "@types/react-router-dom": "^5.3.3",
+    "@types/supertest": "^6.0.3",
+    "@types/uuid": "^10.0.0",
+    "cors": "^2.8.5",
+    "dotenv": "^16.5.0",
+    "supertest": "^7.1.0",
+    "ts-jest": "^29.3.2"
+  },
+  "scripts": {
+    "test": "jest --config jest.config.js"
+  },
+  "dependencies": {
+    "@types/react-dom": "^18.3.7",
+    "@types/socket.io": "^3.0.1",
+    "express": "^5.1.0",
+    "pg": "^8.15.6",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "react-error-overlay": "^6.1.0",
+    "react-router-dom": "^7.5.3",
+    "socket.io": "^4.8.1",
+    "socket.io-client": "^4.8.1"
+  }
+}

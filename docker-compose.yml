@@ -1,0 +1,68 @@
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "5000:5000"
+    volumes:
+      - ./backend/src:/app/src
+    command: npm run dev
+    environment:
+      - NODE_ENV=development
+      - DB_HOST=db
+      - DB_USER=your_username
+      - DB_PASSWORD=your_password
+      - DB_NAME=wer_wird_millionaer
+      - DB_PORT=5432
+      - PGHOST=db
+    depends_on:
+      - db
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend/src:/app/src
+    environment:
+      - NODE_ENV=development
+      - REACT_APP_API_URL=backend
+    depends_on:
+      - backend
+
+  db:
+    image: postgres:13
+    environment:
+      POSTGRES_USER: your_username
+      POSTGRES_PASSWORD: your_password
+      POSTGRES_DB: wer_wird_millionaer
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./backend/database:/docker-entrypoint-initdb.d
+
+  cleanup:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    working_dir: /app
+    command: node dist/database/cleanupRooms.js
+    depends_on:
+      - db
+    environment:
+      - DB_USER=your_username
+      - DB_PASSWORD=your_password
+      - DB_HOST=db
+      - DB_NAME=wer_wird_millionaer
+      - DB_PORT=5432
+
+networks:
+  default:
+    driver: bridge
+
+volumes:
+  db_data:

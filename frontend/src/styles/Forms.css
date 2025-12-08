@@ -1,0 +1,163 @@
+/* Shared styles for form-based pages */
+.form-page-container {
+    max-width: 500px;
+    margin: 50px auto;
+    padding: 30px;
+    background-color: var(--bg-card);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-md);
+    color: var(--text-primary);
+    text-align: center;
+}
+
+.form-page-container h1 {
+    margin-bottom: 25px;
+    color: var(--text-primary);
+}
+
+.form-group {
+    margin-bottom: 20px;
+    text-align: left;
+    display: flex;
+    flex-direction: column;
+}
+
+.form-group label {
+    margin-bottom: 8px;
+    font-weight: 600;
+    color: var(--text-secondary);
+}
+
+.form-input,
+.form-select {
+    padding: 12px;
+    font-size: 16px;
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    background-color: var(--bg-secondary);
+    color: var(--text-primary);
+    transition: border-color 0.2s;
+    width: 100%;
+    box-sizing: border-box;
+    /* Ensure padding doesn't overflow width */
+}
+
+.form-input:focus,
+.form-select:focus {
+    outline: none;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 0 2px rgba(13, 110, 253, 0.2);
+}
+
+.form-submit-btn {
+    width: 100%;
+    margin-top: 20px;
+    background-color: var(--success-color);
+}
+
+.form-submit-btn:hover {
+    background-color: #218838;
+}
+
+.error-message {
+    color: var(--danger-color);
+    margin-top: 15px;
+    padding: 10px;
+    background-color: rgba(220, 53, 69, 0.1);
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--danger-color);
+}
+
+.room-code-display {
+    margin-top: 30px;
+    padding: 20px;
+    background-color: var(--bg-secondary);
+    border-radius: var(--radius-md);
+    border: 2px dashed var(--accent-color);
+}
+
+.room-code-display h2 {
+    font-size: 1.2em;
+    margin-bottom: 10px;
+}
+
+.room-code-display p {
+    font-size: 2em;
+    font-weight: bold;
+    letter-spacing: 2px;
+    margin: 10px 0;
+    color: var(--accent-color);
+}
+/* Topic Selection Styles */
+.form-section-divider {
+    height: 1px;
+    background-color: var(--border-color);
+    margin: 25px 0;
+}
+
+.checkbox-label {
+    display: flex;
+    align-items: center;
+    cursor: pointer;
+    font-size: 1.1rem;
+}
+
+.checkbox-label input[type="checkbox"] {
+    margin-right: 10px;
+    width: 20px;
+    height: 20px;
+}
+
+.topics-selection-area {
+    animation: fadeIn 0.3s ease-in-out;
+}
+
+.categories-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-top: 5px;
+}
+
+.category-chip {
+    padding: 8px 16px;
+    background-color: var(--bg-secondary);
+    border: 1px solid var(--border-color);
+    border-radius: 20px;
+    cursor: pointer;
+    transition: all 0.2s;
+    user-select: none;
+    font-size: 0.9rem;
+}
+
+.category-chip:hover {
+    background-color: var(--accent-color);
+    color: white;
+    border-color: var(--accent-color);
+}
+
+.category-chip.selected {
+    background-color: var(--accent-color);
+    color: white;
+    border-color: var(--accent-color);
+    box-shadow: 0 0 8px rgba(13, 110, 253, 0.4);
+}
+
+.custom-topics-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.form-hint {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+    margin-top: 5px;
+    font-style: italic;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-5px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+

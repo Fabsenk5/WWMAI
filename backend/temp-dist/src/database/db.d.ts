@@ -1,0 +1,10 @@
+import { Pool } from 'pg';
+import { Server } from 'socket.io';
+declare const pool: Pool;
+export default pool;
+export declare const initializeDatabase: (io: Server) => void;
+export declare const getQuestions: (category: string, difficulty: string) => Promise<any[]>;
+export declare const getQuestionById: (id: number) => Promise<any>;
+export declare const connectWithRetry: (retries?: number, delay?: number) => Promise<void>;
+export declare const queryActivePlayers: () => Record<string, string[]>;
+export declare const addPlayerToGame: (playerId: string, roomCode: string, playerName: string) => Promise<void>;
