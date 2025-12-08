@@ -1,4 +1,4 @@
-import pool from '../db';
+import pool from './db';
 import * as fs from 'fs';
 import * as path from 'path';
 
@@ -53,7 +53,8 @@ async function createTables() {
         // We check standard backend path and also a relative check just in case.
         const possiblePaths = [
             path.join(process.cwd(), 'database', 'schema.sql'),
-            path.join(__dirname, '..', '..', '..', 'database', 'schema.sql')
+            path.join(__dirname, 'schema.sql'),
+            path.join(__dirname, '..', '..', 'database', 'schema.sql')
         ];
 
         let schemaPath = possiblePaths.find(p => fs.existsSync(p));

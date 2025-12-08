@@ -8,7 +8,7 @@
     "build": "tsc",
     "dev": "ts-node-dev -r dotenv/config src/app.ts",
     "test": "jest --config jest.config.js",
-    "seed": "ts-node -r dotenv/config src/database/database/seed.ts"
+    "seed": "ts-node -r dotenv/config src/database/seed.ts"
   },
   "dependencies": {
     "@google/generative-ai": "^0.24.1",
@@ -20,7 +20,6 @@
     "dotenv": "^8.2.0",
     "express": "^4.17.1",
     "express-rate-limit": "^8.2.1",
-    "mongoose": "^8.14.1",
     "pg": "^8.15.6",
     "socket.io": "^4.8.1"
   },
