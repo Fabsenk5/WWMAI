@@ -2,8 +2,16 @@ import { Router, Application, Request, Response, NextFunction } from 'express';
 import { GameController } from '../controllers/gameController';
 import pool from '../database/db'; // Import the shared pool
 import { io as socketIoInstance } from '../socketSetup'; // Import from new file
+import rateLimit from 'express-rate-limit'; // Import rateLimit
 
 const router = Router();
+
+// Strict Limiter for Game Creation (AI Cost Control)
+const createGameLimiter = rateLimit({
+    windowMs: 60 * 60 * 1000, // 1 hour
+    max: 10,
+    message: 'Too many games created from this IP. Please wait a while.'
+});
 
 // Middleware to check if a room exists
 async function checkRoomExists(req: Request, res: Response, next: NextFunction): Promise<void> {
@@ -43,7 +51,7 @@ export function setRoutes(app: Application) {
     app.use('/api/games', router);
 
     // Bind the controller methods to the instance
-    router.post('/create', gameController.createGame.bind(gameController));
+    router.post('/create', createGameLimiter, gameController.createGame.bind(gameController));
     router.post('/join', gameController.joinGame.bind(gameController));
     router.post('/:roomCode/start', checkRoomExists, gameController.startGame.bind(gameController));
     router.post('/:roomCode/answer', checkRoomExists, gameController.handleAnswer.bind(gameController));

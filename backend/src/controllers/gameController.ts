@@ -145,8 +145,18 @@ export class GameController {
     public async createGame(req: Request, res: Response): Promise<void> {
         try {
             const { gameName, playerCount, gameMode, lives, categories, customCategories } = req.body;
-            if (!gameName || playerCount <= 0) {
-                res.status(400).json({ error: 'Invalid game name or player count' });
+
+            // Input Validation
+            if (!gameName || gameName.length > 50) {
+                res.status(400).json({ error: 'Invalid game name (max 50 chars)' });
+                return;
+            }
+            if (playerCount <= 0) {
+                res.status(400).json({ error: 'Player count must be positive' });
+                return;
+            }
+            if (customCategories && customCategories.length > 50) {
+                res.status(400).json({ error: 'Too many custom categories' });
                 return;
             }
 
@@ -204,6 +214,11 @@ export class GameController {
 
             if (!roomCode || !userName) {
                 res.status(400).json({ error: 'Room code and user name are required' });
+                return;
+            }
+
+            if (userName.length > 20) {
+                res.status(400).json({ error: 'User name too long (max 20 chars)' });
                 return;
             }
 
@@ -827,7 +842,8 @@ export class GameController {
             console.log(`[getGameById] Found game:`, game); // Log found game data
 
             // Fetch players associated with the game using room_code
-            const playersQuery = `SELECT userId, name, score, lives, jokers_used FROM players WHERE room_code = $1`;
+            // Fetch players associated with the game using room_code (Sanitized: NO userId)
+            const playersQuery = `SELECT name, score, lives, jokers_used FROM players WHERE room_code = $1`;
             const playersResult = await this.db.query(playersQuery, [game.room_code]);
             const players = playersResult.rows;
             console.log(`[getGameById] Found players for room ${game.room_code}:`, players); // Log found players
@@ -863,7 +879,8 @@ export class GameController {
                 return;
             }
 
-            const query = `SELECT userId, name, score, lives, jokers_used FROM players WHERE room_code = $1 ORDER BY score DESC`;
+            // Sanitized: NO userId
+            const query = `SELECT name, score, lives, jokers_used FROM players WHERE room_code = $1 ORDER BY score DESC`;
             const result = await this.db.query(query, [roomCode]);
             res.status(200).json(result.rows);
         } catch (error) {
@@ -1096,7 +1113,8 @@ export class GameController {
             const game = gameResult.rows[0];
 
             // Fetch players associated with the game
-            const playersQuery = `SELECT userId, name, score, lives, jokers_used FROM players WHERE room_code = $1`;
+            // Fetch players associated with the game (Sanitized: NO userId)
+            const playersQuery = `SELECT name, score, lives, jokers_used FROM players WHERE room_code = $1`;
             const playersResult = await this.db.query(playersQuery, [game.room_code]);
             const players = playersResult.rows;
 

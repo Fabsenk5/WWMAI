@@ -51,7 +51,7 @@ const AdminDashboard: React.FC = () => {
 
     const fetchCategories = async () => {
         try {
-            const cats = await getAllCategories();
+            const cats = await getAllCategories(adminPassword);
             setCategories(cats);
         } catch (error) {
             console.error('Failed to load categories', error);
@@ -61,7 +61,7 @@ const AdminDashboard: React.FC = () => {
     const fetchQuestions = async () => {
         setLoadingQuestions(true);
         try {
-            const data: QuestionsResponse = await listQuestions(page, 20, filterCategory, filterDifficulty);
+            const data: QuestionsResponse = await listQuestions(adminPassword, page, 20, filterCategory, filterDifficulty);
             setQuestions(data.questions);
             setTotal(data.total);
             setTotalPages(data.totalPages);

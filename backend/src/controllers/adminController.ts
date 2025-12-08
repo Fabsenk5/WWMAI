@@ -26,7 +26,16 @@ export class AdminController {
     /**
      * Get all categories for administration
      */
+    /**
+     * Get all categories for administration
+     */
     getAllCategories = async (req: Request, res: Response) => {
+        const password = req.body.password || req.query.password;
+        if (password !== this.adminPassword) {
+            res.status(401).json({ error: 'Unauthorized: Invalid password' });
+            return;
+        }
+
         try {
             const categories = await this.questionModel.getAllCategories();
             res.json(categories);
@@ -66,6 +75,12 @@ export class AdminController {
      * List all questions with pagination and filtering
      */
     listQuestions = async (req: Request, res: Response) => {
+        const password = req.body.password || req.query.password;
+        if (password !== this.adminPassword) {
+            res.status(401).json({ error: 'Unauthorized: Invalid password' });
+            return;
+        }
+
         try {
             const page = parseInt(req.query.page as string) || 1;
             const limit = parseInt(req.query.limit as string) || 20;

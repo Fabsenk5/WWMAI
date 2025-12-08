@@ -31,8 +31,9 @@ export const verifyPassword = async (password: string): Promise<boolean> => {
     return data.success;
 };
 
-export const getAllCategories = async (): Promise<string[]> => {
-    const response = await fetch(`${API_URL}/categories`);
+export const getAllCategories = async (password: string): Promise<string[]> => {
+    // Pass password as query param since it's a GET request
+    const response = await fetch(`${API_URL}/categories?password=${encodeURIComponent(password)}`);
     if (!response.ok) throw new Error('Failed to fetch categories');
     return response.json();
 };
@@ -46,8 +47,8 @@ export const deleteQuestionsByCategories = async (categories: string[], password
     return response.json();
 };
 
-export const listQuestions = async (page: number = 1, limit: number = 20, category?: string, difficulty?: string): Promise<QuestionsResponse> => {
-    let url = `${API_URL}/questions?page=${page}&limit=${limit}`;
+export const listQuestions = async (password: string, page: number = 1, limit: number = 20, category?: string, difficulty?: string): Promise<QuestionsResponse> => {
+    let url = `${API_URL}/questions?password=${encodeURIComponent(password)}&page=${page}&limit=${limit}`;
     if (category) url += `&category=${encodeURIComponent(category)}`;
     if (difficulty) url += `&difficulty=${encodeURIComponent(difficulty)}`;
 
