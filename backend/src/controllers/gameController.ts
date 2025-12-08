@@ -601,7 +601,7 @@ export class GameController {
 
             if (isTeamCorrect) {
                 // Update scores for ALL players
-                const updateScoreQuery = `UPDATE players SET score = score + $1 WHERE room_code = $2`;
+                const updateScoreQuery = `UPDATE players SET score = $1 WHERE room_code = $2`;
                 await this.db.query(updateScoreQuery, [currentPrize, roomCode]);
 
                 if (current_level >= 15) {
