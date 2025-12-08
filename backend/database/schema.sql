@@ -61,3 +61,8 @@ CREATE TABLE game_fixed_questions (
 
 -- Add an index for faster lookups
 CREATE INDEX idx_game_fixed_questions_room_code ON game_fixed_questions(room_code);
+
+CREATE TABLE rooms (
+    id SERIAL PRIMARY KEY,
+    last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
