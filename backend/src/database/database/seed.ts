@@ -1,22 +1,6 @@
-import { Pool } from 'pg';
+import pool from '../db';
 import * as fs from 'fs';
 import * as path from 'path';
-import dotenv from 'dotenv'; // Ensure dotenv is used if not running via -r dotenv/config
-
-dotenv.config();
-
-const isDocker = process.env.DB_HOST === 'db';
-const dbHost = isDocker ? 'db' : 'localhost';
-
-// Use DATABASE_URL if available (Render), otherwise construct it
-const dbConnectionString = process.env.DATABASE_URL || `postgresql://${process.env.DB_USER || 'your_username'}:${process.env.DB_PASSWORD || 'your_password'}@${dbHost}:5432/${process.env.DB_NAME || 'wer_wird_millionaer'}`;
-
-// Update pool initialization - enable SSL for production/Render
-const isProduction = process.env.NODE_ENV === 'production';
-const pool = new Pool({
-    connectionString: dbConnectionString,
-    ssl: isProduction ? { rejectUnauthorized: false } : false
-});
 
 const questions = [
     // Easy questions
@@ -66,13 +50,20 @@ async function createTables() {
     try {
         // Resolve path to schema.sql. 
         // Assuming running from backend root: ./database/schema.sql
-        const schemaPath = path.join(process.cwd(), 'database', 'schema.sql');
-        console.log(`Reading schema from: ${schemaPath}`);
+        // We check standard backend path and also a relative check just in case.
+        const possiblePaths = [
+            path.join(process.cwd(), 'database', 'schema.sql'),
+            path.join(__dirname, '..', '..', '..', 'database', 'schema.sql')
+        ];
 
-        if (!fs.existsSync(schemaPath)) {
-            throw new Error(`Schema file not found at ${schemaPath}`);
+        let schemaPath = possiblePaths.find(p => fs.existsSync(p));
+
+        if (!schemaPath) {
+            console.log(`Schema file not found in: ${possiblePaths.join(', ')}`);
+            throw new Error(`Schema file not found.`);
         }
 
+        console.log(`Reading schema from: ${schemaPath}`);
         const schemaSql = fs.readFileSync(schemaPath, 'utf8');
         await pool.query(schemaSql);
         console.log('Tables created successfully.');
@@ -158,29 +149,40 @@ async function seedGames() {
     console.log('Games and associated questions seeded successfully.');
 }
 
-async function seedDatabase() {
+export async function checkAndSeedDatabase() {
+    console.log('Checking database status...');
     try {
-        console.log('Starting database seeding...');
-        const client = await pool.connect();
-        console.log('Database connection successful!');
-        client.release();
+        // Try to access the questions table
+        const result = await pool.query('SELECT 1 FROM questions LIMIT 1');
 
-        await createTables();
+        // If table exists, check if it has data
+        const countResult = await pool.query('SELECT COUNT(*) FROM questions');
+        const count = parseInt(countResult.rows[0].count, 10);
 
-        await seedQuestions();
-        await verifyQuestions();
-        await seedRooms();
-        await seedGames();
+        if (count === 0) {
+            console.log('Database tables exist but are empty. Seeding data...');
+            await seedQuestions();
+            await verifyQuestions();
+            await seedRooms();
+            await seedGames();
+            console.log('Database seeded successfully.');
+        } else {
+            console.log(`Database already contains ${count} questions. Skipping seed.`);
+        }
 
-        console.log('Database seeding completed successfully.');
-    } catch (error) {
-        console.error('Error during database seeding:', error);
-    } finally {
-        console.log('Database seeding script finished. Pool will close when process exits.');
-        await pool.end(); // Close pool properly
+    } catch (error: any) {
+        // If error is "relation does not exist" (code 42P01), we need to create tables
+        if (error.code === '42P01' || error.message.includes('does not exist')) {
+            console.log('Database tables not found. Initializing schema...');
+            await createTables();
+            console.log('Schema initialized. Seeding data...');
+            await seedQuestions();
+            await verifyQuestions();
+            await seedRooms();
+            await seedGames();
+            console.log('Database initialized and seeded successfully.');
+        } else {
+            console.error('Error checking/seeding database:', error);
+        }
     }
 }
-
-seedDatabase();
-
-export { seedDatabase };
