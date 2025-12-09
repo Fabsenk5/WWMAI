@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import '../styles/Forms.css';
+import { API_BASE_URL } from '../config/api';
 
 const RegisterPage: React.FC = () => {
     const [username, setUsername] = useState('');
@@ -17,7 +18,7 @@ const RegisterPage: React.FC = () => {
         setError(null);
 
         try {
-            const response = await axios.post('/api/auth/register', { username, email, password });
+            const response = await axios.post(`${API_BASE_URL}/api/auth/register`, { username, email, password });
             const { token, user } = response.data;
             login(token, user);
             navigate('/'); // Check if we should redirect to profile or home

@@ -2,6 +2,7 @@ import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom'; // Import Link
 import '../styles/Forms.css';
+import { API_BASE_URL } from '../config/api';
 
 const ProfilePage: React.FC = () => {
     const { user, logout, token, login } = useAuth(); // Need token and login to update local state
@@ -19,7 +20,7 @@ const ProfilePage: React.FC = () => {
 
     const handleUpdate = async () => {
         try {
-            const res = await fetch('/api/auth/profile', {
+            const res = await fetch(`${API_BASE_URL}/api/auth/profile`, {
                 method: 'PUT',
                 headers: {
                     'Content-Type': 'application/json',

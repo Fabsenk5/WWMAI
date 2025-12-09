@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import '../styles/Forms.css';
+import { API_BASE_URL } from '../config/api';
 
 const LoginPage: React.FC = () => {
     const [email, setEmail] = useState('');
@@ -16,7 +17,7 @@ const LoginPage: React.FC = () => {
         setError(null);
 
         try {
-            const response = await axios.post('/api/auth/login', { email, password });
+            const response = await axios.post(`${API_BASE_URL}/api/auth/login`, { email, password });
             const { token, user } = response.data;
             login(token, user);
             navigate('/');
