@@ -347,7 +347,7 @@ export class GameController {
             // Optimization: Scale threshold based on number of categories
             // Single category -> Target 50 (Deep pool)
             // 10 categories -> Target 5 each (Total 50, sufficient for game)
-            const questionsPerCategory = Math.max(5, Math.floor(50 / Math.max(1, uniqueCategories.length)));
+            const questionsPerCategory = Math.max(5, Math.floor(150 / Math.max(1, uniqueCategories.length)));
 
             try {
                 // Trigger AI Generation check for ALL selected categories (standard & custom)
