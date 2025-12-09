@@ -177,14 +177,20 @@ export class GameController {
             }
 
             // Remove duplicates
-            selectedCategories = [...new Set(selectedCategories)];
+            const uniqueCategories = [...new Set(selectedCategories)];
+            selectedCategories = uniqueCategories; // Update for DB insert
+
+            // Optimization: Scale threshold based on number of categories
+            // Single category -> Target 50 (Deep pool)
+            // 10 categories -> Target 5 each (Total 50, sufficient for game)
+            const questionsPerCategory = Math.max(5, Math.floor(50 / Math.max(1, uniqueCategories.length)));
 
             try {
                 // Trigger AI Generation check for ALL selected categories (standard & custom)
-                selectedCategories.forEach((category: string) => {
-                    console.log(`[GameController] Checking pool for category: "${category}"`);
+                uniqueCategories.forEach((category: string) => {
+                    console.log(`[GameController] Checking pool for "${category}". Target: ${questionsPerCategory}`);
                     // No await here to keep it background
-                    this.aiService.ensureCategoryPool(category).catch(err => {
+                    this.aiService.ensureCategoryPool(category, questionsPerCategory).catch(err => {
                         console.error(`[GameController] Background pool check failed for "${category}":`, err);
                     });
                 });
