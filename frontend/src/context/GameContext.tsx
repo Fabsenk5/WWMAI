@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useCallback, ReactNode } from 'react';
 import axios from 'axios';
+import { useAuth } from './AuthContext'; // Import useAuth
 
 import { API_BASE_URL } from '../config/api';
 
@@ -75,6 +76,7 @@ const GameContext = createContext<GameContextType | undefined>(undefined);
 // const BASE_URL = 'http://localhost:5000';
 
 export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+    const { token } = useAuth(); // Get token from AuthContext
     const [questions, setQuestions] = useState<Question[]>([]); // Consider removing if using gameData.questions
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const [score, setScore] = useState(0); // Consider moving player-specific state
@@ -141,11 +143,17 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setLoading(true);
         setError(null);
         try {
+            const headers: HeadersInit = {
+                'Content-Type': 'application/json',
+            };
+
+            if (token) {
+                headers['Authorization'] = `Bearer ${token}`; // Add Authorization header
+            }
+
             const response = await fetch(`${API_BASE_URL}/api/games/create`, { // Use centralized URL
                 method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                },
+                headers: headers,
                 body: JSON.stringify({ gameName, playerCount: userCount, gameMode, lives, waitTimer, categories, customCategories, difficultyMode, moderatorMode }), // Include moderatorMode
             });
 

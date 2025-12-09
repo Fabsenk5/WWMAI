@@ -1,6 +1,6 @@
 import React from 'react';
 import { Routes, Route, Link } from 'react-router-dom';
-import { AuthProvider, useAuth } from './context/AuthContext';
+import { useAuth } from './context/AuthContext';
 import './styles/App.css';
 import HomePage from './pages/HomePage';
 import CreateGamePage from './pages/CreateGamePage';
@@ -22,32 +22,30 @@ import ThemeToggle from './components/ThemeToggle';
 
 function App() {
   return (
-    <AuthProvider>
-      <div className="App">
-        <UserIcon />
-        <Branding />
-        <ThemeToggle />
-        <div className="main-content">
-          <Routes>
-            <Route path="/" element={<HomePage />} />
-            <Route path="/create-game" element={<CreateGamePage />} />
-            <Route path="/join" element={<JoinGamePage />} />
-            <Route path="/lobby/:roomCode" element={<LobbyPage />} />
-            <Route path="/game/:id" element={<GamePage />} />
+    <div className="App">
+      <UserIcon />
+      <Branding />
+      <ThemeToggle />
+      <div className="main-content">
+        <Routes>
+          <Route path="/" element={<HomePage />} />
+          <Route path="/create-game" element={<CreateGamePage />} />
+          <Route path="/join" element={<JoinGamePage />} />
+          <Route path="/lobby/:roomCode" element={<LobbyPage />} />
+          <Route path="/game/:id" element={<GamePage />} />
 
-            {/* Auth Routes */}
-            <Route path="/login" element={<LoginPage />} />
-            <Route path="/register" element={<RegisterPage />} />
-            <Route path="/profile" element={<ProfilePage />} />
-            <Route path="/upgrade" element={<UpgradePage />} />
+          {/* Auth Routes */}
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/upgrade" element={<UpgradePage />} />
 
-            {/* Admin Routes */}
-            <Route path="/admin" element={<AdminLogin />} />
-            <Route path="/admin/dashboard" element={<AdminDashboard />} />
-          </Routes>
-        </div>
+          {/* Admin Routes */}
+          <Route path="/admin" element={<AdminLogin />} />
+          <Route path="/admin/dashboard" element={<AdminDashboard />} />
+        </Routes>
       </div>
-    </AuthProvider>
+    </div>
   );
 }
 
