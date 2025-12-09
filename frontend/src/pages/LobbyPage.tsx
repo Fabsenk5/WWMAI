@@ -463,7 +463,7 @@ const LobbyPage: React.FC = () => {
               className={`teammate-card ${gameData?.game_mode === 'survival' && p.lives === 0 ? 'dead' : ''}`}
             >
               <div className="font-bold">{p.name}</div>
-              <div>Current price money: {p.score?.toLocaleString('de-DE')}€</div>
+              <div>Price money: {p.score?.toLocaleString('de-DE')}€</div>
               {gameData?.game_mode === 'survival' && <div>Lives: {p.lives} ❤️</div>}
             </div>
           ))}
