@@ -61,9 +61,12 @@ export const syncDatabaseSchema = async () => {
         await addColumnIfNotExists('games', 'selected_categories', 'TEXT[]');
         await addColumnIfNotExists('games', 'game_mode', "VARCHAR(20) DEFAULT 'cooperative'");
         await addColumnIfNotExists('games', 'lives', 'INT DEFAULT 3');
-        await addColumnIfNotExists('games', 'lives', 'INT DEFAULT 3');
         await addColumnIfNotExists('games', 'wait_time', 'INT DEFAULT 15');
         await addColumnIfNotExists('games', 'moderator_mode', 'BOOLEAN DEFAULT FALSE');
+
+        // Add missing columns for 'users'
+        await addColumnIfNotExists('users', 'avatar_url', 'VARCHAR(255)');
+        await addColumnIfNotExists('users', 'subscription_end_date', 'TIMESTAMP WITH TIME ZONE');
 
         // 4. Ensure 'players' table exists
         await client.query(`
