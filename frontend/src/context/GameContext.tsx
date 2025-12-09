@@ -45,7 +45,7 @@ interface GameContextType {
     fetchQuestions: () => Promise<void>;
     nextQuestion: () => void;
     resetGame: () => void;
-    createGame: (gameName: string, userCount: number, gameMode: string, lives: number, categories?: string[], customCategories?: string[]) => Promise<{ gameId: number; roomCode: string; } | string>; // Add categories
+    createGame: (gameName: string, userCount: number, gameMode: string, lives: number, waitTimer: number, categories?: string[], customCategories?: string[]) => Promise<{ gameId: number; roomCode: string; } | string>; // Add categories
     joinGame: (roomCode: string, userName: string) => Promise<string | void>;
     loading: boolean;
     error: string | null;
@@ -135,7 +135,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
 
     // Updated createGame to return gameId and roomCode or error string
-    const createGame = async (gameName: string, userCount: number, gameMode: string, lives: number, categories?: string[], customCategories?: string[]): Promise<{ gameId: number; roomCode: string } | string> => {
+    const createGame = async (gameName: string, userCount: number, gameMode: string, lives: number, waitTimer: number, categories?: string[], customCategories?: string[]): Promise<{ gameId: number; roomCode: string } | string> => {
         setLoading(true);
         setError(null);
         try {
@@ -144,7 +144,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({ gameName, playerCount: userCount, gameMode, lives, categories, customCategories }), // Include categories
+                body: JSON.stringify({ gameName, playerCount: userCount, gameMode, lives, waitTimer, categories, customCategories }), // Include waitTimer
             });
 
             const responseData = await response.json(); // Always parse JSON

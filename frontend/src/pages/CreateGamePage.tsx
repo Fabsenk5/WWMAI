@@ -7,7 +7,9 @@ import { API_BASE_URL } from '../config/api';
 const CreateGamePage: React.FC = () => {
     const [userCount, setUserCount] = useState(2);
     const [gameMode, setGameMode] = useState('cooperative');
+
     const [lives, setLives] = useState(3);
+    const [waitTimer, setWaitTimer] = useState(15);
     const { createGame, loading, error: contextError } = useContext(GameContext)!;
     const [localError, setLocalError] = useState<string | null>(null);
     const [roomCode, setRoomCode] = useState<string | null>(null);
@@ -61,7 +63,7 @@ const CreateGamePage: React.FC = () => {
             }
         }
 
-        const result = await createGame('New Game', userCount, gameMode, lives, finalCategories, finalCustomTopics);
+        const result = await createGame('New Game', userCount, gameMode, lives, waitTimer, finalCategories, finalCustomTopics);
 
         if (typeof result === 'string') {
             setLocalError(result);
@@ -109,6 +111,18 @@ const CreateGamePage: React.FC = () => {
                     className="form-input"
                     value={lives}
                     onChange={(e) => setLives(Number(e.target.value))}
+                    disabled={loading}
+                />
+            </div>
+            <div className="form-group">
+                <label>Wait Timer (seconds):</label>
+                <input
+                    type="number"
+                    min="5"
+                    max="60"
+                    className="form-input"
+                    value={waitTimer}
+                    onChange={(e) => setWaitTimer(Number(e.target.value))}
                     disabled={loading}
                 />
             </div>

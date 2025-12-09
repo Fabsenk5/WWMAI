@@ -155,6 +155,7 @@ async function ensureSchemaUpdates() {
     try {
         // Migration: Add selected_categories to games if it doesn't exist
         await pool.query('ALTER TABLE games ADD COLUMN IF NOT EXISTS selected_categories TEXT[]');
+        await pool.query('ALTER TABLE games ADD COLUMN IF NOT EXISTS wait_time INT DEFAULT 15');
         console.log('Schema verified/updated: games.selected_categories checked.');
     } catch (err: any) {
         // Ignore "relation does not exist" error, as verify/seed logic will handle creation

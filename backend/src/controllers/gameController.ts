@@ -162,6 +162,7 @@ export class GameController {
 
             const mode = gameMode || 'cooperative';
             const initialLives = lives || 3;
+            const waitTime = req.body.waitTimer || 15;
             const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
 
             // Handle Categories
@@ -190,12 +191,12 @@ export class GameController {
 
             // Insert game with selected_categories
             const query = `
-                INSERT INTO games (name, player_count, room_code, game_mode, lives, selected_categories) 
-                VALUES ($1, $2, $3, $4, $5, $6) 
+                INSERT INTO games (name, player_count, room_code, game_mode, lives, selected_categories, wait_time) 
+                VALUES ($1, $2, $3, $4, $5, $6, $7) 
                 RETURNING game_id, room_code
             `;
             // Postgres array syntax for text[] is handled by node-postgres if passed as array
-            const values = [gameName, playerCount, roomCode, mode, initialLives, selectedCategories.length > 0 ? selectedCategories : null];
+            const values = [gameName, playerCount, roomCode, mode, initialLives, selectedCategories.length > 0 ? selectedCategories : null, waitTime];
 
             const result = await this.db.query(query, values);
             res.status(201).json({ message: 'Game created successfully', gameId: result.rows[0].game_id, roomCode: result.rows[0].room_code });
@@ -424,8 +425,8 @@ export class GameController {
                 return;
             }
 
-            // Get game state including game_mode
-            const gameQuery = `SELECT game_id, current_question_id, current_level, player_count, lives, game_mode FROM games WHERE room_code = $1 AND status = 'started'`;
+            // Get game state including game_mode and wait_time
+            const gameQuery = `SELECT game_id, current_question_id, current_level, player_count, lives, game_mode, wait_time FROM games WHERE room_code = $1 AND status = 'started'`;
             const gameResult = await this.db.query(gameQuery, [roomCode]);
 
             if (gameResult.rows.length === 0) {
@@ -433,7 +434,8 @@ export class GameController {
                 return;
             }
 
-            const { game_id: gameId, current_question_id, current_level, player_count, lives, game_mode } = gameResult.rows[0];
+            const { game_id: gameId, current_question_id, current_level, player_count, lives, game_mode, wait_time } = gameResult.rows[0];
+            const waitTimeInfo = wait_time || 15; // Default to 15 if null
 
             if (!current_question_id) {
                 res.status(409).json({ error: 'No active question.' });
@@ -532,7 +534,7 @@ export class GameController {
                     this.io.to(roomCode).emit('revealAnswers', {
                         correctAnswer: correct_answer,
                         playerAnswers: allAnswersResult.rows,
-                        timeToNextQuestion: 15,
+                        timeToNextQuestion: waitTimeInfo,
                         currentLevel: current_level,
                         gameEnded,
                         gameMode: 'survival'
@@ -541,7 +543,7 @@ export class GameController {
                     if (!gameEnded) {
                         setTimeout(() => {
                             this.advanceToNextQuestion(roomCode, gameId, current_level);
-                        }, 15000);
+                        }, waitTimeInfo * 1000);
                     } else {
                         this.io.to(roomCode).emit('gameEnded', { message });
                     }
@@ -634,7 +636,7 @@ export class GameController {
                 isTeamCorrect: isTeamCorrect,
                 livesRemaining: newLives,
                 playerAnswers: allAnswersResult.rows,
-                timeToNextQuestion: 15,
+                timeToNextQuestion: waitTimeInfo,
                 currentLevel: current_level,
                 gameEnded: gameEnded,
                 gameMode: 'cooperative'
@@ -645,7 +647,7 @@ export class GameController {
             if (!gameEnded) {
                 setTimeout(() => {
                     this.advanceToNextQuestion(roomCode, gameId, current_level);
-                }, 15000); // 15 seconds
+                }, waitTimeInfo * 1000); // Configurable wait time
             } else {
                 this.io.to(roomCode).emit('gameEnded', { message: isTeamCorrect ? 'You won!' : 'Game Over (Lives Depleted)' });
             }
