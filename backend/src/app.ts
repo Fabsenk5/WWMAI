@@ -19,6 +19,9 @@ const app = express();
 const PORT = process.env.PORT || 5000;
 const ROOM_CLEANUP_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes in milliseconds
 
+// Enable trust proxy for Render/Load Balancers so rate limiter sees real IPs
+app.set('trust proxy', 1);
+
 // Middleware
 app.use(json());
 app.use(cors({
