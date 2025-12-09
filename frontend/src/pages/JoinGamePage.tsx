@@ -21,6 +21,13 @@ const JoinGamePage: React.FC = () => {
         } else {
             console.log('No userId found in localStorage. A new one will be generated upon joining.');
         }
+
+        // Parse roomCode from URL
+        const searchParams = new URLSearchParams(window.location.search);
+        const code = searchParams.get('roomCode');
+        if (code) {
+            setRoomCode(code);
+        }
     }, []);
 
     const handleJoinGame = async (e: React.FormEvent) => {

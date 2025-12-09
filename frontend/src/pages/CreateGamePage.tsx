@@ -91,7 +91,14 @@ const CreateGamePage: React.FC = () => {
         } else {
             console.log('Game created successfully:', result);
             setRoomCode(result.roomCode);
-            navigate(`/game/${result.gameId}`);
+
+            if (!moderatorMode) {
+                // Auto-run (Player Mode): Navigate to Join Page with code prefilled
+                navigate(`/join?roomCode=${result.roomCode}`);
+            } else {
+                // Host Mode: Navigate to Game Page (Host View)
+                navigate(`/game/${result.gameId}`);
+            }
         }
     };
 
