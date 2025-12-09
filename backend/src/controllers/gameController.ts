@@ -242,9 +242,6 @@ export class GameController {
     };
 
 
-
-
-
     public async createGame(req: Request | any, res: Response): Promise<void> {
         try {
             const { gameName, playerCount, gameMode, lives, categories, customCategories, difficultyMode } = req.body;
@@ -263,24 +260,42 @@ export class GameController {
 
             // Determine if the requestor has effective premium status
             let hasPremiumAccess = false;
+            let freshStatus = 'unknown';
 
             if (user) {
                 // Logged in user: Fetch FRESH subscription status from DB to avoid stale JWT issues
+                console.log(`[createGame] User logged in. ID: ${user.userId}, Token Role: ${user.role}`);
                 const userRes = await this.db.query("SELECT subscription_status FROM users WHERE id = $1", [user.userId]);
-                const freshStatus = userRes.rows.length > 0 ? userRes.rows[0].subscription_status : 'free';
+                freshStatus = userRes.rows.length > 0 ? userRes.rows[0].subscription_status : 'free';
+                console.log(`[createGame] DB Status for user ${user.userId}: ${freshStatus}`);
 
                 if (freshStatus === 'premium' || globalPremium) {
                     hasPremiumAccess = true;
                 }
             } else {
+                console.log('[createGame] Guest user.');
                 // Guest: Has access if global guest premium is unlocked
                 if (globalGuest) {
                     hasPremiumAccess = true;
                 }
             }
 
+            console.log(`[createGame] hasPremiumAccess: ${hasPremiumAccess}, GlobalPermission: ${globalPremium}, GlobalGuest: ${globalGuest}`);
+
+            // Check Moderator Mode Premium Lock
+            let finalModeratorMode = false;
+            if (req.body.moderatorMode === true) {
+                if (!hasPremiumAccess) {
+                    console.warn(`[createGame] Blocked moderator mode. User: ${user?.userId}, Status: ${freshStatus}`);
+                    res.status(403).json({ error: 'Host View (Moderator Mode) is a Premium feature.' });
+                    return;
+                }
+                finalModeratorMode = true;
+            }
+
             if (customCategories && customCategories.length > 0) {
                 if (!hasPremiumAccess) {
+                    console.warn(`[createGame] Blocked custom categories. User: ${user?.userId}, Status: ${freshStatus}`);
                     res.status(403).json({ error: 'Custom topics are for Premium users only.' });
                     return;
                 }
@@ -289,21 +304,11 @@ export class GameController {
             // Check Difficulty Mode Premium Lock
             if (difficultyMode && difficultyMode !== 'standard') {
                 if (!hasPremiumAccess) {
+                    console.warn(`[createGame] Blocked difficulty selection. User: ${user?.userId}, Status: ${freshStatus}`);
                     res.status(403).json({ error: 'Difficulty selection is a Premium feature.' });
                     return;
                 }
             }
-
-            // Check Moderator Mode Premium Lock
-            let finalModeratorMode = false;
-            if (req.body.moderatorMode === true) {
-                if (!hasPremiumAccess) {
-                    res.status(403).json({ error: 'Host View (Moderator Mode) is a Premium feature.' });
-                    return;
-                }
-                finalModeratorMode = true;
-            }
-            // ---------------------
 
             // Input Validation
             if (!gameName || gameName.length > 50) {
