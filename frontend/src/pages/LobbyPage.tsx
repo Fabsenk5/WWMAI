@@ -455,7 +455,7 @@ const LobbyPage: React.FC = () => {
       )}
 
       <div className="teammates-section">
-        <h3>Teammates</h3>
+        <h3>{gameData?.game_mode === 'survival' ? 'Opponents' : 'Teammates'}</h3>
         <div className="teammates-grid">
           {players.map((p, i) => (
             <div
@@ -463,7 +463,7 @@ const LobbyPage: React.FC = () => {
               className={`teammate-card ${gameData?.game_mode === 'survival' && p.lives === 0 ? 'dead' : ''}`}
             >
               <div className="font-bold">{p.name}</div>
-              <div>Score: {p.score}</div>
+              <div>Current price money: {p.score?.toLocaleString('de-DE')}€</div>
               {gameData?.game_mode === 'survival' && <div>Lives: {p.lives} ❤️</div>}
             </div>
           ))}
