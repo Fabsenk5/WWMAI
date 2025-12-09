@@ -305,13 +305,31 @@ export class QuestionModel {
     async deleteQuestionsByCategories(categories: string[]): Promise<number> {
         if (!categories || categories.length === 0) return 0;
 
+        const client = await this.db.connect();
         try {
+            await client.query('BEGIN');
+
+            // 1. Delete dependent player_answers first
+            const cleanupQuery = `
+                DELETE FROM player_answers 
+                WHERE question_id IN (
+                    SELECT id FROM questions WHERE category = ANY($1)
+                )
+            `;
+            await client.query(cleanupQuery, [categories]);
+
+            // 2. Delete the questions
             const query = 'DELETE FROM questions WHERE category = ANY($1)';
-            const result = await this.db.query(query, [categories]);
+            const result = await client.query(query, [categories]);
+
+            await client.query('COMMIT');
             return result.rowCount || 0;
         } catch (error) {
+            await client.query('ROLLBACK');
             console.error('Error deleting questions by categories:', error);
             throw new Error('Failed to delete questions');
+        } finally {
+            client.release();
         }
     }
 
@@ -372,12 +390,24 @@ export class QuestionModel {
      * @returns Boolean indicating success
      */
     async deleteQuestion(id: number): Promise<boolean> {
+        const client = await this.db.connect();
         try {
-            const result = await this.db.query('DELETE FROM questions WHERE id = $1', [id]);
+            await client.query('BEGIN');
+
+            // 1. Delete dependent player_answers
+            await client.query('DELETE FROM player_answers WHERE question_id = $1', [id]);
+
+            // 2. Delete the question
+            const result = await client.query('DELETE FROM questions WHERE id = $1', [id]);
+
+            await client.query('COMMIT');
             return (result.rowCount || 0) > 0;
         } catch (error) {
+            await client.query('ROLLBACK');
             console.error(`Error deleting question ${id}:`, error);
             throw new Error('Failed to delete question');
+        } finally {
+            client.release();
         }
     }
 }
