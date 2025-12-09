@@ -251,9 +251,46 @@ export class GameController {
             const user = req.user; // Auth middleware attaches this
 
             // --- PREMIUM CHECK ---
+            // Fetch Global Settings
+            const settingsRes = await this.db.query("SELECT key, value FROM system_settings WHERE key IN ('global_premium_unlocked', 'global_guest_premium_unlocked')");
+            const globalSettings: Record<string, boolean> = {};
+            settingsRes.rows.forEach(row => {
+                globalSettings[row.key] = row.value === 'true';
+            });
+
+            const globalPremium = globalSettings['global_premium_unlocked'] || false;
+            const globalGuest = globalSettings['global_guest_premium_unlocked'] || false;
+
+            // Determine if the requestor has effective premium status
+            let hasPremiumAccess = false;
+
+            if (user) {
+                // Logged in user: Has access if they are premium OR global premium is unlocked
+                if (user.role === 'premium' || globalPremium) {
+                    hasPremiumAccess = true;
+                }
+            } else {
+                // Guest: Has access if global guest premium is unlocked
+                if (globalGuest) {
+                    hasPremiumAccess = true;
+                }
+            }
+
+            // Allow if "Global Premium" is checked, it probably should apply to guests too if not specified? 
+            // But strict interpretation:
+            // If I am a guest, I need Global Guest unlocked.
+            // If I am a user, I need My Subscription OR Global Premium unlocked.
+
+            // However, to be safe and generous (as per "deactivated lock"):
+            // If globalPremium is ON, we might treat it as "Premium is Free for Everyone".
+            // But let's stick to the split unless the user complains. 
+            // Actually, usually "Global Premium" implies removing the paywall.
+            // Let's add: If globalPremium is true, EVERYONE has access (including guests)?
+            // No, the UI has two toggles usually. "Unlock for Users", "Unlock for Guests".
+            // So the logic above stands.
+
             if (customCategories && customCategories.length > 0) {
-                // If user is NOT logged in OR is NOT premium
-                if (!user || user.role !== 'premium') { // role mapped from subscription_status in AuthController
+                if (!hasPremiumAccess) {
                     res.status(403).json({ error: 'Custom topics are for Premium users only.' });
                     return;
                 }
@@ -261,19 +298,16 @@ export class GameController {
 
             // Check Difficulty Mode Premium Lock
             if (difficultyMode && difficultyMode !== 'standard') {
-                if (!user || user.role !== 'premium') {
+                if (!hasPremiumAccess) {
                     res.status(403).json({ error: 'Difficulty selection is a Premium feature.' });
                     return;
                 }
             }
 
-            // Check Moderator Mode Premium Lock (Enabling it is premium)
-            // Default is false (Moderator Mode OFF/Auto-run)
+            // Check Moderator Mode Premium Lock
             let finalModeratorMode = false;
-            // If the user explicitly sends true, OR if we decide default is false (which we did)
-            // The frontend sends moderatorMode boolean.
             if (req.body.moderatorMode === true) {
-                if (!user || user.role !== 'premium') {
+                if (!hasPremiumAccess) {
                     res.status(403).json({ error: 'Host View (Moderator Mode) is a Premium feature.' });
                     return;
                 }
