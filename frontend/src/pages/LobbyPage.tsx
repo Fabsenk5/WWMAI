@@ -354,18 +354,35 @@ const LobbyPage: React.FC = () => {
       {revealedAnswers && teamAnswerInfo && (
         <div className="answers-reveal">
           <h2>Round Results</h2>
-          <div className="result-message">
-            {gameData?.game_mode === 'survival' ? (
-              <span>See your result below!</span>
-            ) : (
-              <>
-                Team Choice: <strong>{teamAnswerInfo.answer}</strong>
-                {teamAnswerInfo.isCorrect
-                  ? <span className="text-success ml-2">✅ Correct!</span>
-                  : <span className="text-danger ml-2">❌ Wrong!</span>}
-              </>
-            )}
-          </div>
+
+          {(() => {
+            const myName = getSafeStorage('userName');
+            const myResult = revealedAnswers.playerAnswers.find(p => p.name === myName);
+
+            return (
+              <div className="result-message">
+                {gameData?.game_mode === 'survival' ? (
+                  myResult ? (
+                    <div style={{ fontSize: '1.2em', margin: '10px 0' }}>
+                      Your Answer: <strong>{myResult.answer}</strong>
+                      <span style={{ marginLeft: '10px' }}>
+                        {myResult.is_correct ? '✅' : '❌'}
+                      </span>
+                    </div>
+                  ) : (
+                    <p>You did not answer.</p>
+                  )
+                ) : (
+                  <>
+                    Team Choice: <strong>{teamAnswerInfo.answer}</strong>
+                    {teamAnswerInfo.isCorrect
+                      ? <span className="text-success ml-2">✅ Correct!</span>
+                      : <span className="text-danger ml-2">❌ Wrong!</span>}
+                  </>
+                )}
+              </div>
+            );
+          })()}
 
           <div className="correct-answer-box">
             Correct Answer: <strong>{revealedAnswers.correctAnswer}</strong>
@@ -376,8 +393,9 @@ const LobbyPage: React.FC = () => {
           <h3>Votes:</h3>
           <ul className="list-none">
             {revealedAnswers.playerAnswers.map((pa, idx) => (
-              <li key={idx} className="border-bottom">
-                {pa.name}: {pa.answer}
+              <li key={idx} className="border-bottom" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0' }}>
+                <span>{pa.name}: <strong>{pa.answer}</strong></span>
+                <span>{pa.is_correct ? '✅' : '❌'}</span>
               </li>
             ))}
           </ul>
