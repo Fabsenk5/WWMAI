@@ -95,6 +95,23 @@ export const syncDatabaseSchema = async () => {
         `);
         console.log('[Schema Sync] Verified player_answers table.');
 
+        // 6. Ensure 'system_settings' table exists (Fix for 500 Error)
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS system_settings (
+                key VARCHAR(50) PRIMARY KEY,
+                value VARCHAR(255)
+            );
+        `);
+        // Seed default values if they don't exist
+        await client.query(`
+            INSERT INTO system_settings (key, value)
+            VALUES 
+                ('global_premium_unlocked', 'false'),
+                ('global_guest_premium_unlocked', 'false')
+            ON CONFLICT (key) DO NOTHING;
+        `);
+        console.log('[Schema Sync] Verified system_settings table.');
+
         await client.query('COMMIT');
         console.log('[Schema Sync] Database synchronized successfully.');
 
