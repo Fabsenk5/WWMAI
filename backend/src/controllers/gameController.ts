@@ -713,7 +713,7 @@ export class GameController {
                 if (answersCount >= livingPlayerCount) {
                     // RESOLVE ROUND
                     const allAnswersQuery = `
-                        SELECT p.name, pa.answer, pa.is_correct, p.lives, p.score
+                        SELECT p.name, p.userId, pa.answer, pa.is_correct, p.lives, p.score
                         FROM player_answers pa
                         JOIN players p ON pa.user_id = p.userId AND pa.room_code = p.room_code
                         WHERE pa.question_id = $1 AND pa.room_code = $2 AND pa.level = $3

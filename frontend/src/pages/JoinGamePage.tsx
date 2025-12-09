@@ -50,6 +50,7 @@ const JoinGamePage: React.FC = () => {
                 const newUserId = response.data.userId; // Get userId from backend response
                 if (newUserId) {
                     localStorage.setItem('userId', newUserId); // Store userId in localStorage
+                    localStorage.setItem('userName', userName); // Store userName in localStorage
                     console.log('Storing userId in localStorage:', newUserId);
                     navigate(`/lobby/${roomCode}`); // Navigate to the lobby page
                 } else {
