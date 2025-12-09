@@ -38,8 +38,8 @@ const AdminDashboard: React.FC = () => {
         }
         setAdminPassword(storedPassword);
 
-        // Initial fetch
-        fetchCategories();
+        // Initial fetch - Pass storedPassword directly because setAdminPassword state update isn't immediate
+        fetchCategories(storedPassword);
     }, [navigate]);
 
     useEffect(() => {
@@ -49,9 +49,12 @@ const AdminDashboard: React.FC = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeTab, page, filterCategory, filterDifficulty]);
 
-    const fetchCategories = async () => {
+    const fetchCategories = async (pwd?: string) => {
+        const passwordToUse = pwd || adminPassword;
+        if (!passwordToUse) return;
+
         try {
-            const cats = await getAllCategories(adminPassword);
+            const cats = await getAllCategories(passwordToUse);
             setCategories(cats);
         } catch (error) {
             console.error('Failed to load categories', error);
