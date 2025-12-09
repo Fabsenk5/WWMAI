@@ -357,7 +357,12 @@ const LobbyPage: React.FC = () => {
 
           {(() => {
             const myName = getSafeStorage('userName');
-            const myResult = revealedAnswers.playerAnswers.find(p => p.name === myName);
+            const myUserId = getSafeStorage('userId');
+
+            // Try to find my result by userId first (more reliable), then fallback to name
+            const myResult = revealedAnswers.playerAnswers.find(p =>
+              (myUserId && (p as any).userId === myUserId) || p.name === myName
+            );
 
             return (
               <div className="result-message">
