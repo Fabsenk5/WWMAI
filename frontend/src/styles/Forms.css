@@ -1,11 +1,13 @@
 /* Shared styles for form-based pages */
 .form-page-container {
     max-width: 500px;
-    margin: 50px auto;
+    margin: 0 auto 30px auto;
     padding: 30px;
     background-color: var(--bg-card);
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-md);
+    border: 2px solid var(--border-color);
+    /* Restored outlined look */
     color: var(--text-primary);
     text-align: center;
 }
@@ -39,7 +41,6 @@
     transition: border-color 0.2s;
     width: 100%;
     box-sizing: border-box;
-    /* Ensure padding doesn't overflow width */
 }
 
 .form-input:focus,
@@ -53,10 +54,21 @@
     width: 100%;
     margin-top: 20px;
     background-color: var(--success-color);
+    color: white;
+    padding: 12px;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 1.1em;
+    cursor: pointer;
 }
 
 .form-submit-btn:hover {
     background-color: #218838;
+}
+
+.form-submit-btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
 }
 
 .error-message {
@@ -88,6 +100,7 @@
     margin: 10px 0;
     color: var(--accent-color);
 }
+
 /* Topic Selection Styles */
 .form-section-divider {
     height: 1px;
@@ -117,6 +130,7 @@
     flex-wrap: wrap;
     gap: 10px;
     margin-top: 5px;
+    padding: 2px;
 }
 
 .category-chip {
@@ -157,7 +171,13 @@
 }
 
 @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(-5px); }
-    to { opacity: 1; transform: translateY(0); }
-}
+    from {
+        opacity: 0;
+        transform: translateY(-5px);
+    }
 
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}

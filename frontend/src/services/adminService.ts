@@ -65,3 +65,52 @@ export const deleteQuestion = async (id: number, password: string): Promise<{ su
     });
     return response.json();
 };
+
+export const getGlobalPremiumStatus = async (password: string): Promise<{ userUnlocked: boolean; guestUnlocked: boolean }> => {
+    const response = await fetch(`${API_URL}/global-premium?password=${encodeURIComponent(password)}`);
+    if (!response.ok) throw new Error('Failed to fetch global premium status');
+    const data = await response.json();
+    return { userUnlocked: data.userUnlocked, guestUnlocked: data.guestUnlocked };
+};
+
+export const toggleGlobalPremiumStatus = async (unlocked: boolean, password: string, type: 'user' | 'guest' = 'user'): Promise<boolean> => {
+    const response = await fetch(`${API_URL}/global-premium`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ unlocked, password, type }),
+    });
+    if (!response.ok) throw new Error('Failed to update global premium status');
+    const data = await response.json();
+    return data.unlocked;
+};
+
+export const getPublicGlobalPremiumStatus = async (): Promise<{ userUnlocked: boolean; guestUnlocked: boolean }> => {
+    const response = await fetch(`${API_BASE_URL}/api/auth/global-settings`);
+    if (!response.ok) {
+        console.warn('Failed to fetch public global premium status');
+        return { userUnlocked: false, guestUnlocked: false };
+    }
+    const data = await response.json();
+    return {
+        userUnlocked: data.globalPremiumUnlocked,
+        guestUnlocked: data.globalGuestPremiumUnlocked
+    };
+};
+
+export const grantUserPremium = async (identifier: string, type: 'email' | 'id', password: string): Promise<{ message: string; user?: any }> => {
+    const body: any = { password };
+    if (type === 'email') body.email = identifier;
+    else body.userId = identifier;
+
+    const response = await fetch(`${API_URL}/grant-premium`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+    });
+
+    const data = await response.json();
+    if (!response.ok) {
+        throw new Error(data.error || 'Failed to grant premium');
+    }
+    return data;
+};

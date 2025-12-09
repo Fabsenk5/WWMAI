@@ -1,0 +1,1 @@
+ALTER TABLE games ADD COLUMN moderator_mode BOOLEAN DEFAULT TRUE;

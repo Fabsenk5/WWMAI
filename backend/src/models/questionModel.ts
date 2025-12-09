@@ -65,7 +65,7 @@ export class QuestionModel {
      * @param excludeIds Optional array of question IDs to exclude
      * @returns A question object with normalized fields or null if no question is found
      */
-    async getQuestionByLevel(level: number, excludeIds: number[] = [], categories: string[] | null = null) {
+    async getQuestionByLevel(level: number, excludeIds: number[] = [], categories: string[] | null = null, difficultyMode: string = 'standard') {
         // Validate level
         if (level < 1 || level > 15) {
             console.error(`Invalid level specified: ${level}. Must be between 1 and 15.`);
@@ -73,8 +73,23 @@ export class QuestionModel {
         }
 
         try {
-            // Get the appropriate difficulty for this level
-            const difficulty = difficultyLevels[level - 1];
+            // Determine difficulty based on mode
+            let difficulty = difficultyLevels[level - 1]; // Default 'standard'
+
+            if (difficultyMode === 'easy') {
+                // Easy: 1-10 are 'easy', 11-15 are 'medium'
+                if (level <= 10) difficulty = 'easy';
+                else difficulty = 'medium';
+            } else if (difficultyMode === 'hard') {
+                // Hard: 1-5 are 'medium', 6-15 are 'hard'
+                if (level <= 5) difficulty = 'medium';
+                else difficulty = 'hard'; // 'very_hard' not consistently used in DB yet? Use 'hard' or existing map.
+            } else if (difficultyMode === 'mixed') {
+                // Mixed: Random difficulty
+                const levels = ['easy', 'medium', 'hard'];
+                difficulty = levels[Math.floor(Math.random() * levels.length)];
+            }
+
             let question = null;
 
             // 1. Try: Exact difficulty AND Selected Categories

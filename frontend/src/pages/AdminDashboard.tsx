@@ -5,6 +5,9 @@ import {
     deleteQuestionsByCategories,
     listQuestions,
     deleteQuestion,
+    getGlobalPremiumStatus,
+    toggleGlobalPremiumStatus,
+    grantUserPremium,
     Question,
     QuestionsResponse
 } from '../services/adminService';
@@ -13,7 +16,7 @@ import '../styles/App.css';
 
 const AdminDashboard: React.FC = () => {
     const navigate = useNavigate();
-    const [activeTab, setActiveTab] = useState<'categories' | 'questions'>('categories');
+    const [activeTab, setActiveTab] = useState<'categories' | 'questions' | 'settings' | 'users'>('categories');
     const [adminPassword, setAdminPassword] = useState('');
 
     // Category State
@@ -30,6 +33,15 @@ const AdminDashboard: React.FC = () => {
     const [filterDifficulty, setFilterDifficulty] = useState('');
     const [loadingQuestions, setLoadingQuestions] = useState(false);
 
+    // Global Settings State
+    const [globalPremiumUnlocked, setGlobalPremiumUnlocked] = useState(false);
+    const [globalGuestPremiumUnlocked, setGlobalGuestPremiumUnlocked] = useState(false);
+    const [settingsMessage, setSettingsMessage] = useState('');
+
+    // User Management State
+    const [grantEmail, setGrantEmail] = useState('');
+    const [grantMessage, setGrantMessage] = useState('');
+
     useEffect(() => {
         const storedPassword = localStorage.getItem('adminPassword');
         if (!storedPassword) {
@@ -40,6 +52,8 @@ const AdminDashboard: React.FC = () => {
 
         // Initial fetch - Pass storedPassword directly because setAdminPassword state update isn't immediate
         fetchCategories(storedPassword);
+        fetchGlobalSettings(storedPassword);
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [navigate]);
 
     useEffect(() => {
@@ -58,6 +72,19 @@ const AdminDashboard: React.FC = () => {
             setCategories(cats);
         } catch (error) {
             console.error('Failed to load categories', error);
+        }
+    };
+
+    const fetchGlobalSettings = async (pwd?: string) => {
+        const passwordToUse = pwd || adminPassword;
+        if (!passwordToUse) return;
+
+        try {
+            const { userUnlocked, guestUnlocked } = await getGlobalPremiumStatus(passwordToUse);
+            setGlobalPremiumUnlocked(userUnlocked);
+            setGlobalGuestPremiumUnlocked(guestUnlocked);
+        } catch (error) {
+            console.error('Failed to load global settings', error);
         }
     };
 
@@ -120,6 +147,42 @@ const AdminDashboard: React.FC = () => {
         }
     };
 
+    const handleToggleGlobalPremium = async (type: 'user' | 'guest') => {
+        const currentStatus = type === 'user' ? globalPremiumUnlocked : globalGuestPremiumUnlocked;
+        const newValue = !currentStatus;
+        const targetName = type === 'user' ? 'REGISTERED USERS' : 'GUESTS';
+
+        if (!window.confirm(`Are you sure you want to ${newValue ? 'UNLOCK' : 'LOCK'} premium features for ${targetName}?`)) return;
+
+        try {
+            const unlocked = await toggleGlobalPremiumStatus(newValue, adminPassword, type);
+            if (type === 'user') {
+                setGlobalPremiumUnlocked(unlocked);
+            } else {
+                setGlobalGuestPremiumUnlocked(unlocked);
+            }
+            setSettingsMessage(`${targetName} Premium Features ${unlocked ? 'Unlocked' : 'Locked'}`);
+            setTimeout(() => setSettingsMessage(''), 3000);
+        } catch (error) {
+            console.error('Error updating global premium status:', error);
+            setSettingsMessage('Failed to update status');
+        }
+    };
+
+    const handleGrantPremium = async () => {
+        if (!grantEmail) return;
+        if (!window.confirm(`Are you sure you want to grant PERMANENT premium status to ${grantEmail}?`)) return;
+
+        try {
+            const result = await grantUserPremium(grantEmail, 'email', adminPassword);
+            setGrantMessage(`Success: Premium granted to ${result.user?.username || grantEmail}`);
+            setGrantEmail('');
+        } catch (error: any) {
+            setGrantMessage(`Error: ${error.message}`);
+        }
+        setTimeout(() => setGrantMessage(''), 5000);
+    };
+
     return (
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px', color: 'var(--text-primary)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -147,6 +210,20 @@ const AdminDashboard: React.FC = () => {
                     onClick={() => setActiveTab('questions')}
                 >
                     Question Explorer
+                </button>
+                <button
+                    className={`btn ${activeTab === 'users' ? 'btn-primary' : 'btn-secondary'}`}
+                    style={{ opacity: activeTab === 'users' ? 1 : 0.7 }}
+                    onClick={() => setActiveTab('users')}
+                >
+                    User Management
+                </button>
+                <button
+                    className={`btn ${activeTab === 'settings' ? 'btn-primary' : 'btn-secondary'}`}
+                    style={{ opacity: activeTab === 'settings' ? 1 : 0.7 }}
+                    onClick={() => setActiveTab('settings')}
+                >
+                    Global Settings
                 </button>
             </div>
 
@@ -242,7 +319,7 @@ const AdminDashboard: React.FC = () => {
                                                 </td>
                                                 <td style={{ padding: '10px' }}>{q.difficulty}</td>
                                                 <td style={{ padding: '10px' }}>{q.text}</td>
-                                                <td style={{ padding: '10px', color: 'var(--success-color)' }}>{q.correctAnswer}</td>
+                                                <td style={{ padding: '10px' }}>{q.correctAnswer}</td>
                                                 <td style={{ padding: '10px' }}>
                                                     <button
                                                         className="btn"
@@ -284,6 +361,116 @@ const AdminDashboard: React.FC = () => {
                                 Next
                             </button>
                         </div>
+                    </div>
+                )}
+
+                {activeTab === 'users' && (
+                    <div>
+                        <h2>User Management</h2>
+                        <div style={{ padding: '20px', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)' }}>
+                            <h3>Grant Premium Status</h3>
+                            <p style={{ color: 'var(--text-secondary)' }}>
+                                Manually unlock premium features for a specific user. This updates their subscription status in the database.
+                            </p>
+
+                            <div className="form-group" style={{ maxWidth: '400px' }}>
+                                <label>User Email:</label>
+                                <input
+                                    type="email"
+                                    className="form-input"
+                                    value={grantEmail}
+                                    onChange={(e) => setGrantEmail(e.target.value)}
+                                    placeholder="user@example.com"
+                                />
+                            </div>
+
+                            {grantMessage && (
+                                <div className={`error-message ${grantMessage.includes('Success') ? 'success' : ''}`}
+                                    style={{ borderColor: grantMessage.includes('Success') ? 'var(--success-color)' : '' }}>
+                                    {grantMessage}
+                                </div>
+                            )}
+
+                            <button
+                                className="btn form-submit-btn"
+                                style={{ marginTop: '10px' }}
+                                disabled={!grantEmail}
+                                onClick={handleGrantPremium}
+                            >
+                                Grant Premium
+                            </button>
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'settings' && (
+                    <div>
+                        <h2>Global Settings</h2>
+                        <div style={{
+                            padding: '20px',
+                            border: '1px solid var(--border-color)',
+                            borderRadius: 'var(--radius-sm)',
+                            backgroundColor: 'var(--bg-secondary)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between'
+                        }}>
+                            <div>
+                                <h3 style={{ margin: '0 0 10px 0' }}>Unlock Premium Features</h3>
+                                <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
+                                    When enabled, ALL users (including free tier) will have access to premium features.
+                                </p>
+                            </div>
+                            <div className="toggle-switch">
+                                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '10px' }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={globalPremiumUnlocked}
+                                        onChange={() => handleToggleGlobalPremium('user')}
+                                        style={{ accentColor: 'var(--primary-color)', transform: 'scale(1.5)' }}
+                                    />
+                                    <span style={{ fontWeight: 'bold' }}>
+                                        {globalPremiumUnlocked ? 'UNLOCKED' : 'LOCKED'}
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+
+                        <div style={{
+                            padding: '20px',
+                            border: '1px solid var(--border-color)',
+                            borderRadius: 'var(--radius-sm)',
+                            backgroundColor: 'var(--bg-secondary)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            marginTop: '20px'
+                        }}>
+                            <div>
+                                <h3 style={{ margin: '0 0 10px 0' }}>Unlock Premium for GUESTS</h3>
+                                <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
+                                    When enabled, GUESTS (non-logged-in users) will have access to premium features like Custom Topics.
+                                </p>
+                            </div>
+                            <div className="toggle-switch">
+                                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '10px' }}>
+                                    <input
+                                        type="checkbox"
+                                        checked={globalGuestPremiumUnlocked}
+                                        onChange={() => handleToggleGlobalPremium('guest')}
+                                        style={{ accentColor: 'var(--secondary-color)', transform: 'scale(1.5)' }}
+                                    />
+                                    <span style={{ fontWeight: 'bold' }}>
+                                        {globalGuestPremiumUnlocked ? 'UNLOCKED' : 'LOCKED'}
+                                    </span>
+                                </label>
+                            </div>
+                        </div>
+                        {settingsMessage && (
+                            <div className="error-message success" style={{ marginTop: '20px', borderColor: 'var(--success-color)' }}>
+                                {settingsMessage}
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

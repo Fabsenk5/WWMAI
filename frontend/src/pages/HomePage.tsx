@@ -5,11 +5,11 @@ import './HomePage.css';
 const HomePage: React.FC = () => {
     return (
         <div className="home-page">
-            <h1>Willkommen bei Wer wird Millionär!</h1>
-            <p>Wählen Sie eine Option, um zu beginnen:</p>
+            <h1>Welcome to Who Wants to be a Millionaire!</h1>
+            <p>Choose an option to begin:</p>
             <div className="button-container">
-                <Link to="/create-game" className="button">Neues Spiel erstellen</Link>
-                <Link to="/join" className="button">Spiel beitreten</Link>
+                <Link to="/create-game" className="button">Create New Game</Link>
+                <Link to="/join" className="button">Join Game</Link>
             </div>
         </div>
     );

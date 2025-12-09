@@ -1,6 +1,7 @@
 import React, { useContext, useEffect, useState, useRef } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { GameContext, GameData, User } from '../context/GameContext';
+import { useAuth } from '../context/AuthContext';
 import io, { Socket } from 'socket.io-client';
 import axios from 'axios';
 import './LobbyPage.css'; // Import the new CSS file
@@ -35,6 +36,7 @@ interface QuestionPayload {
 const LobbyPage: React.FC = () => {
   const { roomCode } = useParams();
   const navigate = useNavigate();
+  const { user } = useAuth();
   const context = useContext(GameContext);
   const { gameData, setGameData } = context || {};
 
@@ -217,7 +219,24 @@ const LobbyPage: React.FC = () => {
     socket.on('revealAnswers', handleRevealAnswers);
     socket.on('gameEnded', handleGameEnded);
     socket.on('userJoined', handleUserJoined);
+    socket.on('userJoined', handleUserJoined);
     socket.on('jokerUsed', handleJokerUsed);
+
+    socket.on('playerKicked', (data: { userId: string, name: string }) => {
+      // If I am the one kicked
+      const myId = getSafeStorage('userId');
+      if (data.userId === myId) {
+        alert('You have been kicked from the room.');
+        navigate('/');
+      } else {
+        // Refresh player list
+        if (roomCode) {
+          axios.get(`${API_BASE_URL}/api/games/${roomCode}/players`)
+            .then(res => setPlayers(res.data))
+            .catch(err => console.error('Failed to update players list:', err));
+        }
+      }
+    });
 
     return () => {
       socket.off('connect', onConnect);
@@ -272,6 +291,25 @@ const LobbyPage: React.FC = () => {
       alert('Failed to use joker. It may be already used.');
     }
   };
+
+  const handleKickPlayer = async (userIdToKick: string) => {
+    if (!roomCode) return;
+    if (!window.confirm('Are you sure you want to kick this player?')) return;
+
+    try {
+      // Need token for auth
+      const token = localStorage.getItem('token');
+      await axios.post(`${API_BASE_URL}/api/games/${roomCode}/kick`,
+        { userIdToKick },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      // Socket will handle the UI update via 'playerKicked' event
+    } catch (error: any) {
+      console.error('Failed to kick player:', error);
+      alert(error.response?.data?.error || 'Failed to kick player');
+    }
+  };
+
 
   const handleAnswerSubmit = async () => {
     if (!selectedAnswer || !currentQuestion || !roomCode) return;
@@ -461,10 +499,30 @@ const LobbyPage: React.FC = () => {
             <div
               key={i}
               className={`teammate-card ${gameData?.game_mode === 'survival' && p.lives === 0 ? 'dead' : ''}`}
+              style={{ position: 'relative' }}
             >
               <div className="font-bold">{p.name}</div>
               <div>Price money: {p.score?.toLocaleString('de-DE')}€</div>
               {gameData?.game_mode === 'survival' && <div>Lives: {p.lives} ❤️</div>}
+
+              {/* HOST CONTROLS */}
+              {/* Check if current user is host (via gameData.host_id, assuming we expose it) */}
+              {/* Since we didn't add host_id to GameData interface yet, we might check via user ID comparison if we fetched it */}
+              {/* We need to update GameData interface or just assume we have it in gameData from API */}
+              {/* Assuming gameData includes host_id now (API sends * from games table) */}
+              {user && user.id === (gameData as any)?.host_id && p.userId !== user.id.toString() && (
+                <div style={{ marginTop: '10px' }}>
+                  {user.subscription_status === 'premium' ? (
+                    <button
+                      onClick={() => handleKickPlayer(p.userId)}
+                      className="btn btn-sm btn-danger"
+                      style={{ fontSize: '0.7em', padding: '2px 5px' }}
+                    >
+                      Kick 👢
+                    </button>
+                  ) : null}
+                </div>
+              )}
             </div>
           ))}
         </div>

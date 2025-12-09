@@ -1,5 +1,6 @@
 import { Router, Application, Request, Response, NextFunction } from 'express';
 import { GameController } from '../controllers/gameController';
+import { authenticateToken } from '../middleware/authMiddleware'; // Import Auth Middleware
 import pool from '../database/db'; // Import the shared pool
 import { io as socketIoInstance } from '../socketSetup'; // Import from new file
 import rateLimit from 'express-rate-limit'; // Import rateLimit
@@ -57,6 +58,11 @@ export function setRoutes(app: Application) {
     router.post('/:roomCode/answer', checkRoomExists, gameController.handleAnswer.bind(gameController));
     router.post('/:roomCode/submit-answer', checkRoomExists, gameController.submitAnswer.bind(gameController));
     router.post('/:roomCode/joker', checkRoomExists, gameController.useJoker.bind(gameController));
+    // Protected Kick Route
+    router.post('/:roomCode/kick', authenticateToken, checkRoomExists, gameController.kickPlayer.bind(gameController));
+    router.post('/:roomCode/pause', authenticateToken, checkRoomExists, gameController.pauseGame.bind(gameController));
+    router.post('/:roomCode/end', authenticateToken, checkRoomExists, gameController.endGame.bind(gameController));
+
     router.get('/questions', gameController.getQuestions.bind(gameController));
     router.get('/categories', gameController.getCategories.bind(gameController));
     router.get('/list-active', gameController.getActiveGames.bind(gameController));

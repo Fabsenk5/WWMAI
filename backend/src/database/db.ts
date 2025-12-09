@@ -5,17 +5,29 @@ import { Server } from 'socket.io'; // Import Server from socket.io
 const resolvedHost = process.env.PGHOST || process.env.DB_HOST || 'localhost';
 console.log('Resolved Database Host:', resolvedHost);
 
-// Use connection string for configuration
-const connectionString = process.env.DATABASE_URL || `postgresql://${process.env.DB_USER || 'your_username'}:${process.env.DB_PASSWORD || 'your_password'}@${resolvedHost}:${process.env.DB_PORT || 5432}/${process.env.DB_NAME || 'wer_wird_millionaer'}`;
-console.log('Using connection string:', connectionString.startsWith('postgres') ? '***REDACTED***' : connectionString);
-
-// Ensure the pool instance is correctly instantiated and supports the 'on' method
-// If DATABASE_URL is used (Render), we often need ssl: true.
 const isProduction = process.env.NODE_ENV === 'production';
-const poolConfig = {
-    connectionString,
-    ssl: isProduction ? { rejectUnauthorized: false } : false
-};
+
+let poolConfig: any;
+
+if (process.env.DATABASE_URL) {
+    // Production / Render Environment
+    poolConfig = {
+        connectionString: process.env.DATABASE_URL,
+        ssl: { rejectUnauthorized: false }
+    };
+    console.log('Using DATABASE_URL for connection.');
+} else {
+    // Local Environment
+    poolConfig = {
+        user: process.env.DB_USER || 'your_username',
+        host: resolvedHost,
+        database: process.env.DB_NAME || 'wer_wird_millionaer',
+        password: process.env.DB_PASSWORD || 'your_password',
+        port: parseInt(process.env.DB_PORT || '5432'),
+        ssl: false
+    };
+    console.log(`Using Local Config: User=${poolConfig.user}, Host=${poolConfig.host}, DB=${poolConfig.database}`);
+}
 
 const pool = new Pool(poolConfig);
 

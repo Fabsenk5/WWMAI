@@ -1,15 +1,30 @@
 import React, { useState, useContext, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { GameContext } from '../context/GameContext';
+import { useAuth } from '../context/AuthContext';
 import '../styles/Forms.css';
 import { API_BASE_URL } from '../config/api';
+import { getPublicGlobalPremiumStatus } from '../services/adminService';
 
 const CreateGamePage: React.FC = () => {
+    const { user } = useAuth();
     const [userCount, setUserCount] = useState(2);
     const [gameMode, setGameMode] = useState('cooperative');
+    const [globalUserPremium, setGlobalUserPremium] = useState(false);
+    const [globalGuestPremium, setGlobalGuestPremium] = useState(false);
+
+    // Derived state: 
+    // If user is logged in: premium if sub='premium' OR globalUserPremium is true.
+    // If guest: premium if globalGuestPremium is true.
+    const isPremium = user
+        ? (user.subscription_status === 'premium' || globalUserPremium)
+        : globalGuestPremium;
 
     const [lives, setLives] = useState(3);
     const [waitTimer, setWaitTimer] = useState(5);
+    const [difficultyMode, setDifficultyMode] = useState('standard');
+    const [moderatorMode, setModeratorMode] = useState(true); // Default to true (Host view)
+
     const { createGame, loading, error: contextError } = useContext(GameContext)!;
     const [localError, setLocalError] = useState<string | null>(null);
     const [roomCode, setRoomCode] = useState<string | null>(null);
@@ -31,6 +46,12 @@ const CreateGamePage: React.FC = () => {
                 }
             })
             .catch(err => console.error('Failed to fetch categories:', err));
+
+        // Check global premium status
+        getPublicGlobalPremiumStatus().then(settings => {
+            setGlobalUserPremium(settings.userUnlocked);
+            setGlobalGuestPremium(settings.guestUnlocked);
+        });
     }, []);
 
     const toggleCategory = (category: string) => {
@@ -63,7 +84,7 @@ const CreateGamePage: React.FC = () => {
             }
         }
 
-        const result = await createGame('New Game', userCount, gameMode, lives, waitTimer, finalCategories, finalCustomTopics);
+        const result = await createGame('New Game', userCount, gameMode, lives, waitTimer, finalCategories, finalCustomTopics, difficultyMode, moderatorMode);
 
         if (typeof result === 'string') {
             setLocalError(result);
@@ -127,6 +148,58 @@ const CreateGamePage: React.FC = () => {
                 />
             </div>
 
+            <div className="form-group">
+                <label>
+                    Difficulty Mode:
+                    {!isPremium && <span style={{ color: 'gold', marginLeft: '10px', fontSize: '0.8em' }}>🔒 Premium Only</span>}
+                </label>
+                <select
+                    className="form-select"
+                    value={difficultyMode}
+                    onChange={(e) => setDifficultyMode(e.target.value)}
+                    disabled={loading || !isPremium}
+                    style={!isPremium ? { opacity: 0.7 } : {}}
+                >
+                    <option value="standard">Standard (Classic)</option>
+                    <option value="easy">Easy (More forgiving)</option>
+                    <option value="hard">Hard (Challenge)</option>
+                    <option value="mixed">Mixed (Random Chaos)</option>
+                </select>
+                {!isPremium && (
+                    <p className="form-hint" style={{ fontSize: '0.8em', marginTop: '5px' }}>
+                        Default is Standard. <Link to="/upgrade" style={{ color: 'gold' }}>Upgrade</Link> to unlock difficulty settings.
+                    </p>
+                )}
+            </div>
+
+            <div className="form-group">
+                <label>
+                    Moderator Mode (Host View):
+                    {!isPremium && <span style={{ color: 'gold', marginLeft: '10px', fontSize: '0.8em' }}>🔒 Premium Only (Always ON)</span>}
+                </label>
+                <div style={{ display: 'flex', alignItems: 'center', marginTop: '5px' }}>
+                    <label className="checkbox-label">
+                        <input
+                            type="checkbox"
+                            checked={moderatorMode}
+                            onChange={(e) => isPremium && setModeratorMode(e.target.checked)}
+                            disabled={loading || !isPremium}
+                        />
+                        Enable Host View (Moderator)
+                    </label>
+                </div>
+                {!isPremium && (
+                    <p className="form-hint" style={{ fontSize: '0.8em', marginTop: '5px' }}>
+                        Free users act as Moderators by default. <Link to="/upgrade" style={{ color: 'gold' }}>Upgrade</Link> to play as a regular player.
+                    </p>
+                )}
+                {isPremium && !moderatorMode && (
+                    <p className="form-hint" style={{ fontSize: '0.8em', marginTop: '5px' }}>
+                        You will play as a regular player. The game will auto-run.
+                    </p>
+                )}
+            </div>
+
             <div className="form-section-divider"></div>
 
             <h3>Topic Selection</h3>
@@ -161,21 +234,31 @@ const CreateGamePage: React.FC = () => {
                     </div>
 
                     <div className="form-group">
-                        <label>Custom Topics (AI Generated):</label>
+                        <label>
+                            Custom Topics (AI Generated)
+                            {!isPremium && <span style={{ color: 'gold', marginLeft: '10px' }}>🔒 Premium Only</span>}
+                        </label>
                         <div className="custom-topics-grid">
                             {customTopics.map((topic, index) => (
                                 <input
                                     key={index}
                                     type="text"
-                                    placeholder={`Custom Topic ${index + 1}`}
+                                    placeholder={isPremium ? `Custom Topic ${index + 1}` : "Upgrade to unlock"}
                                     className="form-input"
                                     value={topic}
                                     onChange={(e) => handleCustomTopicChange(index, e.target.value)}
-                                    disabled={loading}
+                                    disabled={loading || !isPremium}
+                                    style={!isPremium ? { backgroundColor: '#333', cursor: 'not-allowed' } : {}}
                                 />
                             ))}
                         </div>
-                        <p className="form-hint">AI will generate questions for these topics.</p>
+                        {(!isPremium) ? (
+                            <p className="form-hint" style={{ color: 'gold' }}>
+                                <Link to="/upgrade" style={{ color: 'gold', textDecoration: 'underline' }}>Upgrade to Premium</Link> to create games with custom topics!
+                            </p>
+                        ) : (
+                            <p className="form-hint">AI will generate questions for these topics.</p>
+                        )}
                     </div>
                 </div>
             )}

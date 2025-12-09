@@ -12,6 +12,10 @@ export function createAdminRouter(pool: Pool): Router {
     router.post('/categories/delete', adminController.deleteQuestionsByCategories);
     router.get('/questions', adminController.listQuestions);
     router.post('/questions/:id/delete', adminController.deleteQuestion);
+    router.post('/grant-premium', adminController.grantPremium);
+    router.get('/global-premium', adminController.getGlobalPremiumStatus);
+    router.post('/global-premium', adminController.toggleGlobalPremiumStatus);
+
 
     return router;
 }

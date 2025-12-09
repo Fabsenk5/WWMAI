@@ -1,4 +1,4 @@
-import { Request, Response } from 'express';
+﻿import { Request, Response } from 'express';
 import { QuestionModel } from '../models/questionModel';
 import { Pool } from 'pg';
 import { Server as SocketIOServer } from 'socket.io'; // Import the type
@@ -51,14 +51,15 @@ export class GameController {
             const excludeIds = usedQuestionsResult.rows.map((row: any) => row.question_id);
             console.log(`[advanceToNextQuestion] Excluding IDs: ${excludeIds.join(', ')}`);
 
-            // Fetch game categories
-            const gameQuery = `SELECT selected_categories FROM games WHERE game_id = $1`;
+            // Fetch game categories and difficulty
+            const gameQuery = `SELECT selected_categories, difficulty_mode FROM games WHERE game_id = $1`;
             const gameResult = await this.db.query(gameQuery, [gameId]);
             const categories = gameResult.rows[0]?.selected_categories || null;
+            const difficultyMode = gameResult.rows[0]?.difficulty_mode || 'standard';
 
             // Fetch the next question
             const nextLevel = currentLevel + 1;
-            const nextQuestion = await this.questionModel.getQuestionByLevel(nextLevel, excludeIds, categories);
+            const nextQuestion = await this.questionModel.getQuestionByLevel(nextLevel, excludeIds, categories, difficultyMode);
 
             if (!nextQuestion) {
                 console.error(`Failed to fetch question for level ${nextLevel}`);
@@ -129,7 +130,7 @@ export class GameController {
         console.log('GameController instantiated with io and AiService');
     }
 
-    // New Endpoint: Fetch all unique categories
+    // Updated Endpoint: Fetch all unique categories
     public async getCategories(req: Request, res: Response): Promise<void> {
         try {
             const query = `SELECT DISTINCT category FROM questions ORDER BY category ASC`;
@@ -142,9 +143,141 @@ export class GameController {
         }
     }
 
-    public async createGame(req: Request, res: Response): Promise<void> {
+    public kickPlayer = async (req: Request | any, res: Response): Promise<void> => {
         try {
-            const { gameName, playerCount, gameMode, lives, categories, customCategories } = req.body;
+            const { roomCode } = req.params;
+            const { userIdToKick } = req.body;
+            const requesterId = req.user?.userId;
+
+            if (!requesterId || !userIdToKick) {
+                res.status(400).json({ error: 'Missing requester or target ID' });
+                return;
+            }
+
+            // 1. Verify Game Host (creator) AND Premium Status
+            const gameQuery = `SELECT host_id FROM games WHERE room_code = $1`;
+            const gameResult = await this.db.query(gameQuery, [roomCode]);
+
+            if (gameResult.rows.length === 0) {
+                res.status(404).json({ error: 'Game not found' });
+                return;
+            }
+
+            const hostId = gameResult.rows[0].host_id;
+
+            if (hostId !== requesterId) {
+                res.status(403).json({ error: 'Only the host can kick players.' });
+                return;
+            }
+
+            // Check if host is premium. 
+            // req.user has the role from the token.
+            if (req.user.role !== 'premium') {
+                res.status(403).json({ error: 'Host kick function is a Premium feature.' });
+                return;
+            }
+
+            // 2. Perform Kick (Remove from players table)
+            // Note: Does not block re-joining (ban) but removes them now.
+            const deleteQuery = `DELETE FROM players WHERE userId = $1 AND room_code = $2 RETURNING name`;
+            const deleteResult = await this.db.query(deleteQuery, [userIdToKick, roomCode]);
+
+            if (deleteResult.rowCount === 0) {
+                res.status(404).json({ error: 'Player not found in this room.' });
+                return;
+            }
+
+            const kickedName = deleteResult.rows[0].name;
+
+            // 3. Emit Socket Event
+            this.io.to(roomCode).emit('playerKicked', { userId: userIdToKick, name: kickedName });
+
+            console.log(`Host ${requesterId} kicked player ${userIdToKick} (${kickedName}) from room ${roomCode}`);
+            res.status(200).json({ message: 'Player kicked successfully' });
+
+        } catch (error) {
+            console.error('Error kicking player:', error);
+            res.status(500).json({ error: 'Server error' });
+        }
+    };
+
+    public pauseGame = async (req: Request | any, res: Response): Promise<void> => {
+        try {
+            const { roomCode } = req.params;
+            const requesterId = req.user?.userId;
+
+            const gameRes = await this.db.query('SELECT host_id FROM games WHERE room_code = $1', [roomCode]);
+            if (gameRes.rows.length === 0 || gameRes.rows[0].host_id !== requesterId) {
+                res.status(403).json({ error: 'Unauthorized' });
+                return;
+            }
+
+            // Toggle pause - for now just emit event
+            this.io.to(roomCode).emit('gamePaused', { message: 'Game paused by host' });
+            res.status(200).json({ message: 'Game paused' });
+
+        } catch (error) {
+            res.status(500).json({ error: 'Server error' });
+        }
+    };
+
+    public endGame = async (req: Request | any, res: Response): Promise<void> => {
+        try {
+            const { roomCode } = req.params;
+            const requesterId = req.user?.userId;
+
+            const gameRes = await this.db.query('SELECT game_id, host_id FROM games WHERE room_code = $1', [roomCode]);
+            if (gameRes.rows.length === 0 || gameRes.rows[0].host_id !== requesterId) {
+                res.status(403).json({ error: 'Unauthorized' });
+                return;
+            }
+
+            await this.db.query("UPDATE games SET status = 'ended' WHERE game_id = $1", [gameRes.rows[0].game_id]);
+            this.io.to(roomCode).emit('gameEnded', { message: 'Host ended the game.' });
+            res.status(200).json({ message: 'Game ended' });
+
+        } catch (error) {
+            res.status(500).json({ error: 'Server error' });
+        }
+    };
+
+
+
+
+
+    public async createGame(req: Request | any, res: Response): Promise<void> {
+        try {
+            const { gameName, playerCount, gameMode, lives, categories, customCategories, difficultyMode } = req.body;
+            const user = req.user; // Auth middleware attaches this
+
+            // --- PREMIUM CHECK ---
+            if (customCategories && customCategories.length > 0) {
+                // If user is NOT logged in OR is NOT premium
+                if (!user || user.role !== 'premium') { // role mapped from subscription_status in AuthController
+                    res.status(403).json({ error: 'Custom topics are for Premium users only.' });
+                    return;
+                }
+            }
+
+            // Check Difficulty Mode Premium Lock
+            if (difficultyMode && difficultyMode !== 'standard') {
+                if (!user || user.role !== 'premium') {
+                    res.status(403).json({ error: 'Difficulty selection is a Premium feature.' });
+                    return;
+                }
+            }
+
+            // Check Moderator Mode Premium Lock (Disabling it is premium)
+            // Default is true (Moderator Mode ON)
+            let finalModeratorMode = true;
+            if (req.body.moderatorMode === false) {
+                if (!user || user.role !== 'premium') {
+                    res.status(403).json({ error: 'Playing as a regular player (disabling Moderator Mode) is a Premium feature.' });
+                    return;
+                }
+                finalModeratorMode = false;
+            }
+            // ---------------------
 
             // Input Validation
             if (!gameName || gameName.length > 50) {
@@ -198,14 +331,16 @@ export class GameController {
                 console.error('[GameController] Error triggering AI service:', aiError);
             }
 
-            // Insert game with selected_categories
+            // Insert game with selected_categories, host_id, difficulty_mode, AND moderator_mode
             const query = `
-                INSERT INTO games (name, player_count, room_code, game_mode, lives, selected_categories, wait_time) 
-                VALUES ($1, $2, $3, $4, $5, $6, $7) 
+                INSERT INTO games (name, player_count, room_code, game_mode, lives, selected_categories, wait_time, host_id, difficulty_mode, moderator_mode) 
+                VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) 
                 RETURNING game_id, room_code
             `;
             // Postgres array syntax for text[] is handled by node-postgres if passed as array
-            const values = [gameName, playerCount, roomCode, mode, initialLives, selectedCategories.length > 0 ? selectedCategories : null, waitTime];
+            const hostId = user ? user.userId : null;
+            const difficultyModeVal = difficultyMode || 'standard';
+            const values = [gameName, playerCount, roomCode, mode, initialLives, selectedCategories.length > 0 ? selectedCategories : null, waitTime, hostId, difficultyModeVal, finalModeratorMode];
 
             const result = await this.db.query(query, values);
             res.status(201).json({ message: 'Game created successfully', gameId: result.rows[0].game_id, roomCode: result.rows[0].room_code });
@@ -277,6 +412,13 @@ export class GameController {
             }
 
             console.log('Player successfully joined:', player);
+
+            // Auto-start Logic
+            if (currentUserCount + 1 >= maxPlayers) {
+                console.log(`Room ${roomCode} is full. Attempting auto-start.`);
+                this.tryAutoStart(roomCode).catch(e => console.error('Auto-start failed:', e));
+            }
+
             res.status(200).json({ userId: player.userid });
         } catch (err) {
             console.error('Error in joinGame method:', err);
@@ -288,6 +430,58 @@ export class GameController {
             }
         }
     }
+
+    // Helper for Auto-Start
+    private async tryAutoStart(roomCode: string): Promise<void> {
+        try {
+            const gameCheckQuery = 'SELECT game_id, status, selected_categories, difficulty_mode FROM games WHERE room_code = $1';
+            const gameCheckResult = await this.db.query(gameCheckQuery, [roomCode]);
+
+            if (gameCheckResult.rows.length === 0) return;
+            const game = gameCheckResult.rows[0];
+            if (game.status !== 'pending') return;
+
+            const categories = game.selected_categories || null;
+            const difficultyMode = game.difficulty_mode || 'standard';
+            const firstQuestion = await this.questionModel.getQuestionByLevel(1, [], categories, difficultyMode);
+
+            if (!firstQuestion) {
+                console.error('Auto-start: No question found.');
+                return;
+            }
+
+            const questionId = firstQuestion.question_id || firstQuestion.id;
+
+            await this.db.query(`
+                UPDATE games
+                SET status = 'started', current_level = 1, current_question_id = $1, last_active = CURRENT_TIMESTAMP
+                WHERE room_code = $2
+            `, [questionId, roomCode]);
+
+            const options = this.getConsistentOptions(questionId, [...(firstQuestion.incorrect_answers || []), firstQuestion.correct_answer]);
+
+            const questionData = {
+                id: questionId,
+                category: firstQuestion.category,
+                difficulty: firstQuestion.difficulty,
+                question: firstQuestion.question,
+                level: 1,
+                prize: getPrizeForLevel(1),
+                options: options
+            };
+
+            this.io.to(roomCode).emit('gameStarted', { message: 'Game Auto-Started! Room Full.' });
+
+            setTimeout(() => {
+                this.io.to(roomCode).emit('newQuestion', questionData);
+            }, 2000);
+
+        } catch (error) {
+            console.error('Error in tryAutoStart:', error);
+        }
+    }
+
+
 
     public async startGame(req: Request, res: Response): Promise<void> {
         let firstQuestion: any = null; // Declare firstQuestion here to make it accessible in the broader scope
@@ -304,7 +498,7 @@ export class GameController {
         try {
             await client.query('BEGIN');
 
-            const gameCheckQuery = 'SELECT game_id, status, selected_categories FROM games WHERE room_code = $1';
+            const gameCheckQuery = 'SELECT game_id, status, selected_categories, difficulty_mode FROM games WHERE room_code = $1';
             const gameCheckResult = await client.query(gameCheckQuery, [roomCode]);
 
             if (gameCheckResult.rows.length === 0) {
@@ -325,7 +519,8 @@ export class GameController {
 
             console.log('startGame: Fetching the first question for level 1.');
             const categories = game.selected_categories || null;
-            firstQuestion = await this.questionModel.getQuestionByLevel(1, [], categories); // Assign to the outer scoped firstQuestion
+            const difficultyMode = game.difficulty_mode || 'standard';
+            firstQuestion = await this.questionModel.getQuestionByLevel(1, [], categories, difficultyMode); // Assign to the outer scoped firstQuestion
 
             if (!firstQuestion) {
                 await client.query('ROLLBACK');

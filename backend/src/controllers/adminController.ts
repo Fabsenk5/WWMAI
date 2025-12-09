@@ -5,10 +5,65 @@ import { QuestionModel } from '../models/questionModel';
 
 export class AdminController {
     private questionModel: QuestionModel;
-    private adminPassword = process.env.ADMIN_PASSWORD || 'admin'; // Default fallback, should use env
+    private db: Pool;
+    private adminPassword = process.env.ADMIN_PASSWORD || 'admin';
 
     constructor(pool: Pool) {
+        this.db = pool;
         this.questionModel = new QuestionModel(pool);
+    }
+
+    /**
+     * Get global premium status
+     */
+    getGlobalPremiumStatus = async (req: Request, res: Response) => {
+        const password = req.body.password || req.query.password;
+        if (password !== this.adminPassword) {
+            res.status(401).json({ error: 'Unauthorized: Invalid password' });
+            return;
+        }
+
+        try {
+            const result = await this.db.query("SELECT key, value FROM system_settings WHERE key IN ('global_premium_unlocked', 'global_guest_premium_unlocked')");
+            const settings: Record<string, boolean> = {};
+            result.rows.forEach(row => {
+                settings[row.key] = row.value === 'true';
+            });
+
+            res.json({
+                userUnlocked: !!settings['global_premium_unlocked'],
+                guestUnlocked: !!settings['global_guest_premium_unlocked']
+            });
+        } catch (error) {
+            console.error('Error fetching global premium status:', error);
+            res.status(500).json({ error: 'Failed to fetch global premium status' });
+        }
+    }
+
+    /**
+     * Toggle global premium status
+     */
+    toggleGlobalPremiumStatus = async (req: Request, res: Response) => {
+        const { password, unlocked, type } = req.body;
+
+        if (password !== this.adminPassword) {
+            res.status(401).json({ error: 'Unauthorized: Invalid password' });
+            return;
+        }
+
+        const key = type === 'guest' ? 'global_guest_premium_unlocked' : 'global_premium_unlocked';
+
+        try {
+            const newValue = unlocked ? 'true' : 'false';
+            await this.db.query(
+                "INSERT INTO system_settings (key, value) VALUES ($1, $2) ON CONFLICT (key) DO UPDATE SET value = $2",
+                [key, newValue]
+            );
+            res.json({ success: true, unlocked: newValue === 'true', type: type || 'user' });
+        } catch (error) {
+            console.error('Error updating global premium status:', error);
+            res.status(500).json({ error: 'Failed to update global premium status' });
+        }
     }
 
     /**
@@ -130,6 +185,62 @@ export class AdminController {
         } catch (error) {
             console.error('Error deleting question:', error);
             res.status(500).json({ error: 'Failed to delete question' });
+        }
+    }
+
+    /**
+     * Grant Premium Status (Admin)
+     */
+    grantPremium = async (req: Request, res: Response) => {
+        try {
+            const { userId, email, password } = req.body;
+
+            if (password !== this.adminPassword) {
+                res.status(401).json({ error: 'Unauthorized: Invalid password' });
+                return;
+            }
+
+            if (!userId && !email) {
+                res.status(400).json({ error: 'UserId or Email required' });
+                return;
+            }
+
+            // Using direct pool query since questionModel doesn't handle users
+            // Check if user exists and their current status
+            const checkQuery = userId
+                ? `SELECT id, subscription_status FROM users WHERE id = $1`
+                : `SELECT id, subscription_status FROM users WHERE email = $1`;
+            const checkValues = userId ? [userId] : [email];
+            const checkResult = await this.db.query(checkQuery, checkValues);
+
+            if (checkResult.rows.length === 0) {
+                res.status(404).json({ error: 'User not found' });
+                return;
+            }
+
+            if (checkResult.rows[0].subscription_status === 'premium') {
+                res.status(409).json({ error: 'User already has premium status' });
+                return;
+            }
+
+            const query = userId
+                ? `UPDATE users SET subscription_status = 'premium' WHERE id = $1 RETURNING username, email, subscription_status`
+                : `UPDATE users SET subscription_status = 'premium' WHERE email = $1 RETURNING username, email, subscription_status`;
+
+            const values = userId ? [userId] : [email];
+
+            const result = await this.db.query(query, values);
+
+            if (result.rows.length === 0) {
+                res.status(404).json({ error: 'User not found' });
+                return;
+            }
+
+            res.status(200).json({ message: 'Premium granted', user: result.rows[0] });
+
+        } catch (error: any) {
+            console.error('Error granting premium:', error);
+            res.status(500).json({ error: 'Internal server error: ' + error.message });
         }
     }
 }

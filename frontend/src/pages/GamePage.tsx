@@ -27,6 +27,12 @@ const GamePage: React.FC = () => {
   const socketRef = useRef<ReturnType<typeof io> | null>(null);
   const roomCode = gameData?.room_code;
 
+  // Determine if the current user is the host AND moderator mode is enabled
+  const userId = localStorage.getItem('userId');
+  const isHostUser = gameData?.host_id === userId;
+  const isModeratorMode = gameData?.moderator_mode !== false; // Default to true if undefined
+  const showHostView = isHostUser && isModeratorMode;
+
   // --- Effect 1: Fetch initial game data ---
   useEffect(() => {
     if (id) fetchGameData(id);
@@ -253,7 +259,7 @@ const GamePage: React.FC = () => {
           showCorrectAnswer={true}
           errorMessage={questionError}
           onRefresh={refreshQuestion}
-          isHost={true}
+          isHost={showHostView}
         />
       )}
 
