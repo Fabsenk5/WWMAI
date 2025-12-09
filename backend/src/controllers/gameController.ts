@@ -165,7 +165,7 @@ export class GameController {
             const waitTime = req.body.waitTimer || 15;
             const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
 
-            // Handle Categories
+            // Handle Categories - Combine both sources to trigger AI checks
             let selectedCategories: string[] = [];
             if (Array.isArray(categories)) {
                 selectedCategories = [...selectedCategories, ...categories];
@@ -174,19 +174,22 @@ export class GameController {
                 // Filter empty strings
                 const validCustom = customCategories.filter((c: string) => c && c.trim() !== '');
                 selectedCategories = [...selectedCategories, ...validCustom];
+            }
 
-                try {
-                    // Trigger AI Generation in Background
-                    validCustom.forEach((category: string) => {
-                        console.log(`[GameController] Triggering AI generation for: "${category}"`);
-                        // No await here to keep it background
-                        this.aiService.generateQuestionsForCategory(category).catch(err => {
-                            console.error(`[GameController] Background generation failed for "${category}":`, err);
-                        });
+            // Remove duplicates
+            selectedCategories = [...new Set(selectedCategories)];
+
+            try {
+                // Trigger AI Generation check for ALL selected categories (standard & custom)
+                selectedCategories.forEach((category: string) => {
+                    console.log(`[GameController] Checking pool for category: "${category}"`);
+                    // No await here to keep it background
+                    this.aiService.ensureCategoryPool(category).catch(err => {
+                        console.error(`[GameController] Background pool check failed for "${category}":`, err);
                     });
-                } catch (aiError) {
-                    console.error('[GameController] Error triggering AI service:', aiError);
-                }
+                });
+            } catch (aiError) {
+                console.error('[GameController] Error triggering AI service:', aiError);
             }
 
             // Insert game with selected_categories

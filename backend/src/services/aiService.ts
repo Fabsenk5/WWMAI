@@ -30,22 +30,44 @@ export class AiService {
         }
     }
 
-    public async generateQuestionsForCategory(category: string): Promise<void> {
+    public async ensureCategoryPool(category: string, threshold: number = 50): Promise<void> {
         if (!this.genAI) {
             console.log(`[AiService] Skipping generation for '${category}': No API Key.`);
             return;
         }
 
-        console.log(`[AiService] 🤖 Starting background generation for category: "${category}"`);
-
         try {
+            // 1. Check current count
+            const countQuery = `SELECT COUNT(*) FROM questions WHERE category = $1`;
+            const countRes = await this.db.query(countQuery, [category]);
+            const currentCount = parseInt(countRes.rows[0].count, 10);
+
+            console.log(`[AiService] Category "${category}" has ${currentCount} questions. Threshold: ${threshold}.`);
+
+            const gap = threshold - currentCount;
+
+            if (gap <= 0) {
+                console.log(`[AiService] Pool sufficient for "${category}". Skipping generation.`);
+                return;
+            }
+
+            // 2. Determine amount to generate (Cap at 20 to strictly limit load per request)
+            const amountToGenerate = Math.min(gap, 20);
+            console.log(`[AiService] 🤖 Starting background generation for "${category}". Target: ${amountToGenerate} new questions.`);
+
+            // 3. Calculate difficulty distribution dynamically
+            const easyCount = Math.ceil(amountToGenerate * 0.25);
+            const mediumCount = Math.ceil(amountToGenerate * 0.35);
+            const hardCount = Math.ceil(amountToGenerate * 0.25);
+            const veryHardCount = Math.max(0, amountToGenerate - (easyCount + mediumCount + hardCount));
+
             const prompt = `
-                Generate 15 unique trivia questions for the category "${category}".
+                Generate ${amountToGenerate} unique trivia questions for the category "${category}".
                 Create questions with varying difficulties based on this mapping:
-                - 4 Easy questions (Levels 1-4)
-                - 5 Medium questions (Levels 5-9)
-                - 4 Hard questions (Levels 10-13)
-                - 2 Very Hard questions (Levels 14-15)
+                - ${easyCount} Easy questions (Levels 1-4)
+                - ${mediumCount} Medium questions (Levels 5-9)
+                - ${hardCount} Hard questions (Levels 10-13)
+                - ${veryHardCount} Very Hard questions (Levels 14-15)
 
                 Return the output strictly as a JSON array of objects with this format:
                 {
@@ -125,7 +147,7 @@ export class AiService {
             console.log(`[AiService] ✅ Successfully processed category: "${category}". New questions inserted: ${insertedCount}.`);
 
         } catch (error) {
-            console.error(`[AiService] ❌ Error generating questions for category "${category}":`, error);
+            console.error(`[AiService] ❌ Error ensuring pool for category "${category}":`, error);
         }
     }
 }

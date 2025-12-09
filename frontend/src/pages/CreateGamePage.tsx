@@ -9,7 +9,7 @@ const CreateGamePage: React.FC = () => {
     const [gameMode, setGameMode] = useState('cooperative');
 
     const [lives, setLives] = useState(3);
-    const [waitTimer, setWaitTimer] = useState(15);
+    const [waitTimer, setWaitTimer] = useState(5);
     const { createGame, loading, error: contextError } = useContext(GameContext)!;
     const [localError, setLocalError] = useState<string | null>(null);
     const [roomCode, setRoomCode] = useState<string | null>(null);
