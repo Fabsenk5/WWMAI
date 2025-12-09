@@ -968,10 +968,10 @@ export class GameController {
             } else if (jokerType === 'audience') {
                 // Simulate Audience
                 const difficulty = question.difficulty;
-                let correctChance = 0.9; // Easy
-                if (difficulty === 'medium') correctChance = 0.6;
-                if (difficulty === 'hard') correctChance = 0.4;
-                if (difficulty === 'very_hard') correctChance = 0.25;
+                let correctChance = 1.0; // Easy: 100%
+                if (difficulty === 'medium') correctChance = 0.9; // Medium: 90%
+                if (difficulty === 'hard') correctChance = 0.75; // Hard: 75%
+                if (difficulty === 'very_hard') correctChance = 0.6; // Very Hard: 60%
 
                 const options = this.getConsistentOptions(question.id, [...question.incorrect_answers, question.correct_answer]);
                 const stats: Record<string, number> = {};
@@ -1010,10 +1010,11 @@ export class GameController {
                 let isCorrect = false;
 
                 // Heuristic for friend correctness
+                // Easy: 90%, Medium: 70%, Hard: 55%, Very Hard: 40%
                 if (difficulty === 'easy' && hit > 0.1) isCorrect = true;
-                else if (difficulty === 'medium' && hit > 0.4) isCorrect = true;
-                else if (difficulty === 'hard' && hit > 0.7) isCorrect = true;
-                else if (difficulty === 'very_hard' && hit > 0.9) isCorrect = true;
+                else if (difficulty === 'medium' && hit > 0.3) isCorrect = true;
+                else if (difficulty === 'hard' && hit > 0.45) isCorrect = true;
+                else if (difficulty === 'very_hard' && hit > 0.6) isCorrect = true;
 
                 payload = {
                     message: isCorrect
