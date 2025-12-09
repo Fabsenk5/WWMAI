@@ -318,7 +318,17 @@ export class QuestionModel {
             `;
             await client.query(cleanupQuery, [categories]);
 
-            // 2. Delete the questions
+            // 2. Dereference from games table (set current_question_id to NULL)
+            const dereferenceQuery = `
+                UPDATE games 
+                SET current_question_id = NULL
+                WHERE current_question_id IN (
+                    SELECT id FROM questions WHERE category = ANY($1)
+                )
+            `;
+            await client.query(dereferenceQuery, [categories]);
+
+            // 3. Delete the questions
             const query = 'DELETE FROM questions WHERE category = ANY($1)';
             const result = await client.query(query, [categories]);
 
@@ -397,7 +407,10 @@ export class QuestionModel {
             // 1. Delete dependent player_answers
             await client.query('DELETE FROM player_answers WHERE question_id = $1', [id]);
 
-            // 2. Delete the question
+            // 2. Dereference from games table
+            await client.query('UPDATE games SET current_question_id = NULL WHERE current_question_id = $1', [id]);
+
+            // 3. Delete the question
             const result = await client.query('DELETE FROM questions WHERE id = $1', [id]);
 
             await client.query('COMMIT');
