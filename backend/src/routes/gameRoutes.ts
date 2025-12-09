@@ -1,6 +1,6 @@
 import { Router, Application, Request, Response, NextFunction } from 'express';
 import { GameController } from '../controllers/gameController';
-import { authenticateToken } from '../middleware/authMiddleware'; // Import Auth Middleware
+import { authenticateToken, optionalAuthenticateToken } from '../middleware/authMiddleware'; // Import Auth Middleware
 import pool from '../database/db'; // Import the shared pool
 import { io as socketIoInstance } from '../socketSetup'; // Import from new file
 import rateLimit from 'express-rate-limit'; // Import rateLimit
@@ -52,7 +52,7 @@ export function setRoutes(app: Application) {
     app.use('/api/games', router);
 
     // Bind the controller methods to the instance
-    router.post('/create', createGameLimiter, gameController.createGame.bind(gameController));
+    router.post('/create', createGameLimiter, optionalAuthenticateToken, gameController.createGame.bind(gameController));
     router.post('/join', gameController.joinGame.bind(gameController));
     router.post('/:roomCode/start', checkRoomExists, gameController.startGame.bind(gameController));
     router.post('/:roomCode/answer', checkRoomExists, gameController.handleAnswer.bind(gameController));

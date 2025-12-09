@@ -25,3 +25,21 @@ export const authenticateToken = (req: AuthRequest, res: Response, next: NextFun
         next();
     });
 };
+
+export const optionalAuthenticateToken = (req: AuthRequest, res: Response, next: NextFunction): void => {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1]; // Bearer TOKEN
+
+    if (!token) {
+        next();
+        return;
+    }
+
+    jwt.verify(token, JWT_SECRET, (err: any, user: any) => {
+        if (!err) {
+            req.user = user;
+        }
+        // If error, just proceed as guest (user remains undefined)
+        next();
+    });
+};
