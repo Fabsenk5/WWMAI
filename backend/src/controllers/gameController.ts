@@ -265,8 +265,11 @@ export class GameController {
             let hasPremiumAccess = false;
 
             if (user) {
-                // Logged in user: Has access if they are premium OR global premium is unlocked
-                if (user.role === 'premium' || globalPremium) {
+                // Logged in user: Fetch FRESH subscription status from DB to avoid stale JWT issues
+                const userRes = await this.db.query("SELECT subscription_status FROM users WHERE id = $1", [user.userId]);
+                const freshStatus = userRes.rows.length > 0 ? userRes.rows[0].subscription_status : 'free';
+
+                if (freshStatus === 'premium' || globalPremium) {
                     hasPremiumAccess = true;
                 }
             } else {
@@ -275,19 +278,6 @@ export class GameController {
                     hasPremiumAccess = true;
                 }
             }
-
-            // Allow if "Global Premium" is checked, it probably should apply to guests too if not specified? 
-            // But strict interpretation:
-            // If I am a guest, I need Global Guest unlocked.
-            // If I am a user, I need My Subscription OR Global Premium unlocked.
-
-            // However, to be safe and generous (as per "deactivated lock"):
-            // If globalPremium is ON, we might treat it as "Premium is Free for Everyone".
-            // But let's stick to the split unless the user complains. 
-            // Actually, usually "Global Premium" implies removing the paywall.
-            // Let's add: If globalPremium is true, EVERYONE has access (including guests)?
-            // No, the UI has two toggles usually. "Unlock for Users", "Unlock for Guests".
-            // So the logic above stands.
 
             if (customCategories && customCategories.length > 0) {
                 if (!hasPremiumAccess) {
