@@ -321,9 +321,15 @@ const LobbyPage: React.FC = () => {
         questionId: currentQuestion.id
       });
       setAnswerSubmitted(true);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error submitting answer:', error);
-      alert('Failed to submit answer');
+      const msg = error.response?.data?.error || 'Failed to submit answer';
+      // Specific handling for elimination/spectator error to provide visual feedback
+      if (msg.toLowerCase().includes('eliminated')) {
+        alert('You are eliminated and cannot vote! (Spectator)');
+      } else {
+        alert(msg);
+      }
     }
   };
 
@@ -459,22 +465,23 @@ const LobbyPage: React.FC = () => {
           )}
 
           {(() => {
-            const myId = getSafeStorage('userId');
-            const me = players.find(p => p.userId === myId) || players.find(p => p.name === getSafeStorage('userName'));
+            const myUserId = getSafeStorage('userId');
+            const myName = getSafeStorage('userName');
+            const me = players.find(p => (myUserId && p.userId === myUserId)) || players.find(p => p.name === myName);
             const isSurvival = gameData?.game_mode === 'survival';
             const isAlive = isSurvival ? (me ? me.lives > 0 : true) : ((gameData?.lives ?? 0) > 0);
 
             if (!isAlive) {
-              return (
-                <div className="spectator-mode">
-                  <h3>👀 Spectator Mode</h3>
-                  <p>You have been eliminated. You can continue watching the game!</p>
-                </div>
-              );
+              // Render disabled view for spectators instead of hiding everything
             }
 
             return (
               <>
+                {!isAlive && (
+                  <div style={{ textAlign: 'center', margin: '10px 0', color: 'var(--danger-color)', fontWeight: 'bold' }}>
+                    🚫 You are eliminated (Spectator Mode) 🚫
+                  </div>
+                )}
                 <div className="options-grid">
                   {currentQuestion.options.map((option, index) => {
                     if (jokerResult?.wrongAnswersToRemove?.includes(option)) {
@@ -487,8 +494,12 @@ const LobbyPage: React.FC = () => {
                       <button
                         key={index}
                         onClick={() => setSelectedAnswer(option)}
-                        disabled={answerSubmitted}
+                        disabled={answerSubmitted || !isAlive}
                         className={`option-button ${selectedAnswer === option ? 'selected' : ''}`}
+                        style={{
+                          opacity: !isAlive ? 0.6 : 1,
+                          cursor: !isAlive ? 'not-allowed' : 'pointer'
+                        }}
                       >
                         {option}
                       </button>
@@ -498,10 +509,14 @@ const LobbyPage: React.FC = () => {
                 {!answerSubmitted && (
                   <button
                     onClick={handleAnswerSubmit}
-                    disabled={!selectedAnswer}
+                    disabled={!selectedAnswer || !isAlive}
                     className="submit-button"
+                    style={{
+                      backgroundColor: !isAlive ? '#555' : '',
+                      cursor: !isAlive ? 'not-allowed' : 'pointer'
+                    }}
                   >
-                    Submit Vote
+                    {!isAlive ? 'Eliminated' : 'Submit Vote'}
                   </button>
                 )}
                 {answerSubmitted && <div className="text-secondary text-center mt-2">Vote submitted. Waiting for {gameData?.game_mode === 'survival' ? 'other players' : 'team'}...</div>}
