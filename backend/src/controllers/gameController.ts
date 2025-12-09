@@ -884,7 +884,10 @@ export class GameController {
                     this.advanceToNextQuestion(roomCode, gameId, current_level);
                 }, waitTimeInfo * 1000); // Configurable wait time
             } else {
-                this.io.to(roomCode).emit('gameEnded', { message: isTeamCorrect ? 'You won!' : 'Game Over (Lives Depleted)' });
+                // DELAY Game Over so players can see the reveal (correct answer)
+                setTimeout(() => {
+                    this.io.to(roomCode).emit('gameEnded', { message: isTeamCorrect ? 'You won!' : 'Game Over (Lives Depleted)' });
+                }, waitTimeInfo * 1000);
             }
 
             res.status(200).json({ message: 'Round resolved', waiting: false, teamAnswer, isTeamCorrect });
