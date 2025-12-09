@@ -30,7 +30,7 @@ const GamePage: React.FC = () => {
   // Determine if the current user is the host AND moderator mode is enabled
   const userId = localStorage.getItem('userId');
   const isHostUser = gameData?.host_id === userId;
-  const isModeratorMode = gameData?.moderator_mode !== false; // Default to true if undefined
+  const isModeratorMode = gameData?.moderator_mode === true; // Default to false if undefined
   const showHostView = isHostUser && isModeratorMode;
 
   // --- Effect 1: Fetch initial game data ---

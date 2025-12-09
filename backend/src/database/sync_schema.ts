@@ -63,7 +63,7 @@ export const syncDatabaseSchema = async () => {
         await addColumnIfNotExists('games', 'lives', 'INT DEFAULT 3');
         await addColumnIfNotExists('games', 'lives', 'INT DEFAULT 3');
         await addColumnIfNotExists('games', 'wait_time', 'INT DEFAULT 15');
-        await addColumnIfNotExists('games', 'moderator_mode', 'BOOLEAN DEFAULT TRUE');
+        await addColumnIfNotExists('games', 'moderator_mode', 'BOOLEAN DEFAULT FALSE');
 
         // 4. Ensure 'players' table exists
         await client.query(`

@@ -267,15 +267,17 @@ export class GameController {
                 }
             }
 
-            // Check Moderator Mode Premium Lock (Disabling it is premium)
-            // Default is true (Moderator Mode ON)
-            let finalModeratorMode = true;
-            if (req.body.moderatorMode === false) {
+            // Check Moderator Mode Premium Lock (Enabling it is premium)
+            // Default is false (Moderator Mode OFF/Auto-run)
+            let finalModeratorMode = false;
+            // If the user explicitly sends true, OR if we decide default is false (which we did)
+            // The frontend sends moderatorMode boolean.
+            if (req.body.moderatorMode === true) {
                 if (!user || user.role !== 'premium') {
-                    res.status(403).json({ error: 'Playing as a regular player (disabling Moderator Mode) is a Premium feature.' });
+                    res.status(403).json({ error: 'Host View (Moderator Mode) is a Premium feature.' });
                     return;
                 }
-                finalModeratorMode = false;
+                finalModeratorMode = true;
             }
             // ---------------------
 

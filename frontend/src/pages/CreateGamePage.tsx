@@ -23,7 +23,7 @@ const CreateGamePage: React.FC = () => {
     const [lives, setLives] = useState(3);
     const [waitTimer, setWaitTimer] = useState(5);
     const [difficultyMode, setDifficultyMode] = useState('standard');
-    const [moderatorMode, setModeratorMode] = useState(true); // Default to true (Host view)
+    const [moderatorMode, setModeratorMode] = useState(false); // Default to false (Auto-run)
 
     const { createGame, loading, error: contextError } = useContext(GameContext)!;
     const [localError, setLocalError] = useState<string | null>(null);
@@ -175,7 +175,7 @@ const CreateGamePage: React.FC = () => {
             <div className="form-group">
                 <label>
                     Moderator Mode (Host View):
-                    {!isPremium && <span style={{ color: 'gold', marginLeft: '10px', fontSize: '0.8em' }}>🔒 Premium Only (Always ON)</span>}
+                    {!isPremium && <span style={{ color: 'gold', marginLeft: '10px', fontSize: '0.8em' }}>🔒 Premium Only</span>}
                 </label>
                 <div style={{ display: 'flex', alignItems: 'center', marginTop: '5px' }}>
                     <label className="checkbox-label">
@@ -188,14 +188,15 @@ const CreateGamePage: React.FC = () => {
                         Enable Host View (Moderator)
                     </label>
                 </div>
-                {!isPremium && (
+                {!isPremium ? (
                     <p className="form-hint" style={{ fontSize: '0.8em', marginTop: '5px' }}>
-                        Free users act as Moderators by default. <Link to="/upgrade" style={{ color: 'gold' }}>Upgrade</Link> to play as a regular player.
+                        Game auto-runs for all players by default. <Link to="/upgrade" style={{ color: 'gold' }}>Upgrade</Link> to enable Host Mode.
                     </p>
-                )}
-                {isPremium && !moderatorMode && (
+                ) : (
                     <p className="form-hint" style={{ fontSize: '0.8em', marginTop: '5px' }}>
-                        You will play as a regular player. The game will auto-run.
+                        {moderatorMode
+                            ? "You will act as the Host/Moderator."
+                            : "Game will auto-run. You will play as a regular player."}
                     </p>
                 )}
             </div>
