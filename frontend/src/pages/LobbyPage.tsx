@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { GameContext, GameData, User } from '../context/GameContext';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
+import { useTranslation } from 'react-i18next';
 import { useModal } from '../context/ModalContext';
 import { useAudio } from '../context/AudioContext';
 import io, { Socket } from 'socket.io-client';
@@ -42,6 +43,7 @@ const LobbyPage: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { language } = useLanguage();
+  const { t } = useTranslation();
   const context = useContext(GameContext);
   const { gameData, setGameData } = context || {};
 
@@ -397,27 +399,27 @@ const LobbyPage: React.FC = () => {
   return (
     <div className="lobby-page">
       <header className="lobby-header">
-        <h1>{gameData?.game_mode === 'survival' ? 'Millionaire Survival' : 'Cooperative Millionaire'}</h1>
+        <h1>{gameData?.game_mode === 'survival' ? t('game_mode_survival') : t('game_mode_coop')}</h1>
         {gameData?.game_mode !== 'survival' && (
           <div className={`lobby-lives ${(gameData?.lives || 0) > 1 ? 'text-success' : 'text-danger'}`}>
-            Team Lives: {gameData?.lives ?? 3} ❤️
+            {t('team_lives')}: {gameData?.lives ?? 3} ❤️
           </div>
         )}
       </header>
 
       <div className="lobby-room-info">
-        <strong>Room:</strong> {roomCode} | <strong>Level:</strong> {gameData?.current_level ?? 0}
+        <strong>{t('room')}:</strong> {roomCode} | <strong>{t('level')}:</strong> {gameData?.current_level ?? 0}
       </div>
 
       {waitingForCount && !revealedAnswers && (
         <div className="waiting-message">
-          Waiting for teammates... ({waitingForCount.count} / {waitingForCount.total} answered)
+          {t('waiting_teammates')} ({waitingForCount.count} / {waitingForCount.total})
         </div>
       )}
 
       {revealedAnswers && teamAnswerInfo && (
         <div className="answers-reveal">
-          <h2>Round Results</h2>
+          <h2>{t('round_results')}</h2>
 
           {(() => {
             const myName = getSafeStorage('userName');
@@ -433,7 +435,7 @@ const LobbyPage: React.FC = () => {
                 {gameData?.game_mode === 'survival' ? (
                   myResult ? (
                     <div style={{ fontSize: '1.2em', margin: '10px 0' }}>
-                      Your Answer: <strong>{myResult.answer}</strong>
+                      {t('your_answer')}: <strong>{myResult.answer}</strong>
                       <span style={{ marginLeft: '10px' }}>
                         {myResult.is_correct ? '✅' : '❌'}
                       </span>
@@ -443,10 +445,10 @@ const LobbyPage: React.FC = () => {
                   )
                 ) : (
                   <>
-                    Team Choice: <strong>{teamAnswerInfo.answer}</strong>
+                    {t('team_choice')}: <strong>{teamAnswerInfo.answer}</strong>
                     {teamAnswerInfo.isCorrect
-                      ? <span className="text-success ml-2">✅ Correct!</span>
-                      : <span className="text-danger ml-2">❌ Wrong!</span>}
+                      ? <span className="text-success ml-2">✅</span>
+                      : <span className="text-danger ml-2">❌</span>}
                   </>
                 )}
               </div>
@@ -454,12 +456,12 @@ const LobbyPage: React.FC = () => {
           })()}
 
           <div className="correct-answer-box">
-            Correct Answer: <strong>{revealedAnswers.correctAnswer}</strong>
+            {t('correct_answer')}: <strong>{revealedAnswers.correctAnswer}</strong>
           </div>
 
-          <p>Next question in {countdown}s...</p>
+          <p>{t('next_question_in')} {countdown}s...</p>
 
-          <h3>Votes:</h3>
+          <h3>{t('votes')}:</h3>
           <ul className="list-none">
             {revealedAnswers.playerAnswers.map((pa, idx) => (
               <li key={idx} className="border-bottom" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0' }}>
@@ -484,8 +486,8 @@ const LobbyPage: React.FC = () => {
 
             const jokers = [
               { type: '5050', label: '50:50', icon: '🌗' },
-              { type: 'audience', label: 'Audience', icon: '👥' },
-              { type: 'phone', label: 'Phone', icon: '📞' }
+              { type: 'audience', label: t('joker_audience'), icon: '👥' },
+              { type: 'phone', label: t('joker_phone'), icon: '📞' }
             ];
 
             return (
@@ -574,10 +576,10 @@ const LobbyPage: React.FC = () => {
                       cursor: !isAlive ? 'not-allowed' : 'pointer'
                     }}
                   >
-                    {!isAlive ? 'Eliminated' : 'Submit Vote'}
+                    {!isAlive ? t('btn_eliminated') : t('btn_submit')}
                   </button>
                 )}
-                {answerSubmitted && <div className="text-secondary text-center mt-2">Vote submitted. Waiting for {gameData?.game_mode === 'survival' ? 'other players' : 'team'}...</div>}
+                {answerSubmitted && <div className="text-secondary text-center mt-2">{t('votes')}...</div>}
               </>
             );
           })()}
@@ -585,11 +587,11 @@ const LobbyPage: React.FC = () => {
       )}
 
       {!currentQuestion && !revealedAnswers && (
-        <div className="text-center p-5">Waiting for game to start...</div>
+        <div className="text-center p-5">{t('waiting_start')}</div>
       )}
 
       <div className="teammates-section">
-        <h3>{gameData?.game_mode === 'survival' ? 'Opponents' : 'Teammates'}</h3>
+        <h3>{gameData?.game_mode === 'survival' ? t('opponents') : t('teammates')}</h3>
         <div className="teammates-grid">
           {players.map((p, i) => (
             <div
@@ -598,7 +600,7 @@ const LobbyPage: React.FC = () => {
               style={{ position: 'relative' }}
             >
               <div className="font-bold">{p.name}</div>
-              <div>Price money: {p.score?.toLocaleString('de-DE')}€</div>
+              <div>{t('price_money')}: {p.score?.toLocaleString('de-DE')}€</div>
               {gameData?.game_mode === 'survival' && <div>Lives: {p.lives} ❤️</div>}
 
               {/* HOST CONTROLS */}
@@ -614,7 +616,7 @@ const LobbyPage: React.FC = () => {
                       className="btn btn-sm btn-danger"
                       style={{ fontSize: '0.7em', padding: '2px 5px' }}
                     >
-                      Kick 👢
+                      {t('btn_kick')} 👢
                     </button>
                   ) : null}
                 </div>
