@@ -35,7 +35,8 @@ const pool = new Pool(poolConfig);
 if (typeof pool.on === 'function') {
     pool.on('error', (err) => {
         console.error('Unexpected error on idle client', err);
-        process.exit(-1); // Exit if the pool encounters a critical error
+        // Do not exit process for idle client errors, as they are common with serverless DBs (Neon)
+        // process.exit(-1); 
     });
 } else {
     console.warn('The pool instance does not support the .on method. Skipping error listener setup.');
