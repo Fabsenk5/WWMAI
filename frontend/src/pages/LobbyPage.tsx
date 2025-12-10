@@ -2,6 +2,7 @@ import React, { useContext, useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { GameContext, GameData, User } from '../context/GameContext';
 import { useAuth } from '../context/AuthContext';
+import { useLanguage } from '../context/LanguageContext';
 import { useModal } from '../context/ModalContext';
 import { useAudio } from '../context/AudioContext';
 import io, { Socket } from 'socket.io-client';
@@ -27,9 +28,10 @@ interface QuestionPayload {
   category: string;
   difficulty: string;
   question: string;
+  questionTranslations?: Record<string, string>;
   level: number;
   prize: number;
-  options: string[];
+  options: any[]; // Can be string[] (legacy) or {text, translations}[]
   status?: string;
   userHasAnswered?: boolean;
   userAnswer?: string;
@@ -39,6 +41,7 @@ const LobbyPage: React.FC = () => {
   const { roomCode } = useParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { language } = useLanguage();
   const context = useContext(GameContext);
   const { gameData, setGameData } = context || {};
 
@@ -506,7 +509,9 @@ const LobbyPage: React.FC = () => {
           })()}
 
           <div className="question-box">
-            {currentQuestion.question}
+            {(currentQuestion.questionTranslations && currentQuestion.questionTranslations[language])
+              ? currentQuestion.questionTranslations[language]
+              : currentQuestion.question}
           </div>
 
           {/* Modal now handled by Context */}
@@ -531,7 +536,13 @@ const LobbyPage: React.FC = () => {
                 )}
                 <div className="options-grid">
                   {currentQuestion.options.map((option, index) => {
-                    if (jokerResult?.wrongAnswersToRemove?.includes(option)) {
+                    const isLegacy = typeof option === 'string';
+                    const optionText = isLegacy ? option : option.text;
+                    const optionDisplay = isLegacy
+                      ? option
+                      : (option.translations && option.translations[language] ? option.translations[language] : option.text);
+
+                    if (jokerResult?.wrongAnswersToRemove?.includes(optionText)) {
                       return (
                         <button key={index} disabled className="option-button hidden">-</button>
                       );
@@ -540,15 +551,15 @@ const LobbyPage: React.FC = () => {
                     return (
                       <button
                         key={index}
-                        onClick={() => setSelectedAnswer(option)}
+                        onClick={() => setSelectedAnswer(optionText)}
                         disabled={answerSubmitted || !isAlive}
-                        className={`option-button ${selectedAnswer === option ? 'selected' : ''}`}
+                        className={`option-button ${selectedAnswer === optionText ? 'selected' : ''}`}
                         style={{
                           opacity: !isAlive ? 0.6 : 1,
                           cursor: !isAlive ? 'not-allowed' : 'pointer'
                         }}
                       >
-                        {option}
+                        {optionDisplay}
                       </button>
                     );
                   })}
