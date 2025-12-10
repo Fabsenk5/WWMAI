@@ -2,6 +2,7 @@ import React, { useContext, useEffect, useState, useRef } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import { GameContext, GameData, User } from '../context/GameContext';
 import { useAuth } from '../context/AuthContext';
+import { useModal } from '../context/ModalContext';
 import io, { Socket } from 'socket.io-client';
 import axios from 'axios';
 import './LobbyPage.css'; // Import the new CSS file
@@ -40,6 +41,8 @@ const LobbyPage: React.FC = () => {
   const context = useContext(GameContext);
   const { gameData, setGameData } = context || {};
 
+  const { showModal, showAlert } = useModal();
+
   const [players, setPlayers] = useState<User[]>([]);
   const [currentQuestion, setCurrentQuestion] = useState<QuestionPayload | null>(null);
   const [selectedAnswer, setSelectedAnswer] = useState<string | null>(null);
@@ -52,7 +55,6 @@ const LobbyPage: React.FC = () => {
   const [teamAnswerInfo, setTeamAnswerInfo] = useState<{ answer: string, isCorrect: boolean } | null>(null);
 
   const [jokerResult, setJokerResult] = useState<{ wrongAnswersToRemove?: string[] } | null>(null);
-  const [jokerModal, setJokerModal] = useState<{ title: string, content: string } | null>(null);
 
   const socketRef = useRef<Socket | null>(null);
 
@@ -192,7 +194,7 @@ const LobbyPage: React.FC = () => {
     };
 
     const handleGameEnded = (data: { message: string }) => {
-      alert(data.message);
+      showAlert(data.message, 'Game Over');
       navigate('/');
     };
 
@@ -226,7 +228,7 @@ const LobbyPage: React.FC = () => {
       // If I am the one kicked
       const myId = getSafeStorage('userId');
       if (data.userId === myId) {
-        alert('You have been kicked from the room.');
+        showAlert('You have been kicked from the room.', 'Kicked');
         navigate('/');
       } else {
         // Refresh player list
@@ -282,33 +284,44 @@ const LobbyPage: React.FC = () => {
       } else if (jokerType === 'audience') {
         const stats: Record<string, number> = data.stats;
         const content = Object.keys(stats).map(key => `${key}: ${stats[key]}%`).join('\n');
-        setJokerModal({ title: 'Audience Poll Result', content });
+        showModal({ title: 'Audience Poll Result', body: <div className="whitespace-pre">{content}</div>, hideCancel: true, confirmText: 'OK' });
       } else if (jokerType === 'phone') {
-        setJokerModal({ title: 'Phone a Friend', content: data.message });
+        showModal({ title: 'Phone a Friend', body: data.message, hideCancel: true, confirmText: 'Thanks' });
       }
     } catch (err) {
       console.error('Failed to use joker:', err);
-      alert('Failed to use joker. It may be already used.');
+      showAlert('Failed to use joker. It may be already used.', 'Error');
     }
   };
 
   const handleKickPlayer = async (userIdToKick: string) => {
     if (!roomCode) return;
-    if (!window.confirm('Are you sure you want to kick this player?')) return;
 
-    try {
-      // Need token for auth
-      const token = localStorage.getItem('token');
-      await axios.post(`${API_BASE_URL}/api/games/${roomCode}/kick`,
-        { userIdToKick },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      // Socket will handle the UI update via 'playerKicked' event
-    } catch (error: any) {
-      console.error('Failed to kick player:', error);
-      alert(error.response?.data?.error || 'Failed to kick player');
-    }
+    showModal({
+      title: 'Kick Player',
+      body: 'Are you sure you want to kick this player?',
+      confirmText: 'Kick',
+      cancelText: 'Cancel',
+      onConfirm: async () => {
+        try {
+          // Need token for auth
+          const token = localStorage.getItem('token');
+          await axios.post(`${API_BASE_URL}/api/games/${roomCode}/kick`,
+            { userIdToKick },
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          // Socket will handle the UI update via 'playerKicked' event
+        } catch (error: any) {
+          console.error('Failed to kick player:', error);
+          showAlert(error.response?.data?.error || 'Failed to kick player', 'Error');
+        }
+      }
+    });
   };
+
+
+  // Old handleKickPlayer partially replaced within showModal above. 
+  // Need to merge logic. Let's redefine main function body properly.
 
 
   const handleAnswerSubmit = async () => {
@@ -326,9 +339,9 @@ const LobbyPage: React.FC = () => {
       const msg = error.response?.data?.error || 'Failed to submit answer';
       // Specific handling for elimination/spectator error to provide visual feedback
       if (msg.toLowerCase().includes('eliminated')) {
-        alert('You are eliminated and cannot vote! (Spectator)');
+        showAlert('You are eliminated and cannot vote! (Spectator)', 'Spectator Mode');
       } else {
-        alert(msg);
+        showAlert(msg, 'Error');
       }
     }
   };
@@ -454,15 +467,7 @@ const LobbyPage: React.FC = () => {
             {currentQuestion.question}
           </div>
 
-          {jokerModal && (
-            <div className="modal-overlay">
-              <div className="modal-content">
-                <h3>{jokerModal.title}</h3>
-                <div className="whitespace-pre">{jokerModal.content}</div>
-                <button onClick={() => setJokerModal(null)}>Close</button>
-              </div>
-            </div>
-          )}
+          {/* Modal now handled by Context */}
 
           {(() => {
             const myUserId = getSafeStorage('userId');

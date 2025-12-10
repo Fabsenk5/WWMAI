@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useContext, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { GameContext, Question } from '../context/GameContext';
+import { useModal } from '../context/ModalContext';
 import QuestionDisplay from '../components/QuestionDisplay';
 import Scoreboard from '../components/Scoreboard';
 import { API_BASE_URL } from '../config/api';
@@ -9,6 +10,7 @@ import '../styles/Game.css';
 
 const GamePage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const { showAlert } = useModal();
   console.log(`[GamePage] Mounted. ID from URL: ${id}`);
 
   const {
@@ -179,6 +181,7 @@ const GamePage: React.FC = () => {
         }
       } catch (error) {
         console.error('Failed to submit answer:', error);
+        showAlert('Failed to submit answer', 'Error');
       }
     }
   };
@@ -197,6 +200,7 @@ const GamePage: React.FC = () => {
         }
       } catch (err) {
         console.error('Error starting game:', err);
+        showAlert('Error starting game', 'Error');
       }
     }
   };
