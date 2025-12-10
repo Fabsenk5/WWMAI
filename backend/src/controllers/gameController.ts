@@ -881,7 +881,7 @@ export class GameController {
                     this.io.to(roomCode).emit('revealAnswers', {
                         correctAnswer: correct_answer,
                         playerAnswers: allAnswersResult.rows,
-                        timeToNextQuestion: waitTimeInfo,
+                        timeToNextQuestion: gameEnded ? waitTimeInfo + 30 : waitTimeInfo,
                         currentLevel: current_level,
                         gameEnded,
                         gameMode: 'survival'
@@ -892,7 +892,11 @@ export class GameController {
                             this.advanceToNextQuestion(roomCode, gameId, current_level);
                         }, waitTimeInfo * 1000);
                     } else {
-                        this.io.to(roomCode).emit('gameEnded', { message });
+                        // Delay Game Over for 30s + waitTime to let users see results
+                        const finalMessage = message === 'Game Over! Victory!' ? 'You won - Victory!' : message;
+                        setTimeout(() => {
+                            this.io.to(roomCode).emit('gameEnded', { message: finalMessage });
+                        }, (waitTimeInfo + 30) * 1000);
                     }
 
                     res.status(200).json({ message: 'All answers received.', waiting: false });
@@ -983,7 +987,7 @@ export class GameController {
                 isTeamCorrect: isTeamCorrect,
                 livesRemaining: newLives,
                 playerAnswers: allAnswersResult.rows,
-                timeToNextQuestion: waitTimeInfo,
+                timeToNextQuestion: gameEnded ? waitTimeInfo + 30 : waitTimeInfo,
                 currentLevel: current_level,
                 gameEnded: gameEnded,
                 gameMode: 'cooperative'
@@ -998,8 +1002,8 @@ export class GameController {
             } else {
                 // DELAY Game Over so players can see the reveal (correct answer)
                 setTimeout(() => {
-                    this.io.to(roomCode).emit('gameEnded', { message: isTeamCorrect ? 'You won!' : 'Game Over (Lives Depleted)' });
-                }, waitTimeInfo * 1000);
+                    this.io.to(roomCode).emit('gameEnded', { message: isTeamCorrect ? 'You won - Victory!' : 'Game Over (Lives Depleted)' });
+                }, (waitTimeInfo + 30) * 1000);
             }
 
             res.status(200).json({ message: 'Round resolved', waiting: false, teamAnswer, isTeamCorrect });
