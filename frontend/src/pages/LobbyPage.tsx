@@ -3,6 +3,7 @@ import { useParams, useNavigate, Link } from 'react-router-dom';
 import { GameContext, GameData, User } from '../context/GameContext';
 import { useAuth } from '../context/AuthContext';
 import { useModal } from '../context/ModalContext';
+import { useAudio } from '../context/AudioContext';
 import io, { Socket } from 'socket.io-client';
 import axios from 'axios';
 import './LobbyPage.css'; // Import the new CSS file
@@ -42,6 +43,7 @@ const LobbyPage: React.FC = () => {
   const { gameData, setGameData } = context || {};
 
   const { showModal, showAlert } = useModal();
+  const { playTrack, playSFX, getAudioForLevel, stopAll } = useAudio();
 
   const [players, setPlayers] = useState<User[]>([]);
   const [currentQuestion, setCurrentQuestion] = useState<QuestionPayload | null>(null);
@@ -148,6 +150,26 @@ const LobbyPage: React.FC = () => {
       setSelectedAnswer(null);
       setWaitingForCount(null);
 
+      // Audio: Play background loop for level
+      // If it's level 1, play "Let's Play" first? Or just loop question theme.
+      // Plan says: Let's Play > Bg Loop.
+      const level = question.level || 1;
+      const bgTrack = getAudioForLevel(level, 'question');
+
+      // If it is the VERY first question (level 1), maybe play "Let's Play" intro stinger?
+      // "10 Let's Play.mp3"
+      if (level === 1) {
+        playTrack('10 Let\'s Play.mp3', false); // Intro
+        setTimeout(() => {
+          playTrack(bgTrack, true); // Loop
+        }, 4000); // Intro is approx 20s but maybe too long to wait? Let's just start loop after short delay or immediately. 
+        // User list says "Let's Play" is 20s. "Let's Play $2,000" is 11s.
+        // Ideally we queue it. For now, simple transition.
+        playTrack(bgTrack, true);
+      } else {
+        playTrack(bgTrack, true);
+      }
+
       if (question && question.question) {
         setCurrentQuestion(question);
         setGameDataFromContext(prev => {
@@ -171,6 +193,15 @@ const LobbyPage: React.FC = () => {
       setRevealedAnswers(data);
       setTeamAnswerInfo({ answer: data.teamAnswer, isCorrect: data.isTeamCorrect });
       setCountdown(data.timeToNextQuestion);
+
+      // Audio: Win/Lose
+      stopAll(); // Stop background tension
+      const level = data.currentLevel || 1;
+      if (data.isTeamCorrect) {
+        playSFX(getAudioForLevel(level, 'win'));
+      } else {
+        playSFX(getAudioForLevel(level, 'lose'));
+      }
       setWaitingForCount(null);
       setGameDataFromContext(prev => prev ? { ...prev, lives: data.livesRemaining } : null);
 
@@ -194,6 +225,8 @@ const LobbyPage: React.FC = () => {
     };
 
     const handleGameEnded = (data: { message: string }) => {
+      stopAll();
+      playTrack('63 Closing Theme.mp3', false); // Play closing theme
       showAlert(data.message, 'Game Over');
       navigate('/');
     };
@@ -207,6 +240,11 @@ const LobbyPage: React.FC = () => {
     };
 
     const handleJokerUsed = (data: { jokerType: string, userId: string }) => {
+      // Audio: Joker SFX
+      if (data.jokerType === '5050') playSFX('67 50-50.mp3');
+      if (data.jokerType === 'audience') playSFX('68 Ask The Audience.mp3');
+      if (data.jokerType === 'phone') playSFX('66 Phone-A-Friend.mp3');
+
       if (data.userId === 'TEAM') {
         setGameDataFromContext(prev => {
           if (!prev) return null;
@@ -334,6 +372,9 @@ const LobbyPage: React.FC = () => {
         questionId: currentQuestion.id
       });
       setAnswerSubmitted(true);
+      // Audio: Final Answer
+      const level = currentQuestion.level || 1;
+      playSFX(getAudioForLevel(level, 'final_answer'));
     } catch (error: any) {
       console.error('Error submitting answer:', error);
       const msg = error.response?.data?.error || 'Failed to submit answer';

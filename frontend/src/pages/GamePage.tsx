@@ -2,6 +2,7 @@ import React, { useEffect, useState, useContext, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { GameContext, Question } from '../context/GameContext';
 import { useModal } from '../context/ModalContext';
+import { useAudio } from '../context/AudioContext';
 import QuestionDisplay from '../components/QuestionDisplay';
 import Scoreboard from '../components/Scoreboard';
 import { API_BASE_URL } from '../config/api';
@@ -11,6 +12,7 @@ import '../styles/Game.css';
 const GamePage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { showAlert } = useModal();
+  const { playTrack, playSFX, getAudioForLevel, stopAll } = useAudio();
   console.log(`[GamePage] Mounted. ID from URL: ${id}`);
 
   const {
@@ -93,6 +95,19 @@ const GamePage: React.FC = () => {
       socket.on('gameEnded', () => setGameEnded(true));
 
       socket.on('revealAnswers', (data) => {
+        // Audio: Win/Lose
+        stopAll();
+        // Assuming data has level info or we use current gameData level
+        const level = gameData?.current_level || 1; // Might be off by one if next level sent?
+        // Data usually contains result. We need to know if WE won or Team won.
+        // GamePage logic seems less complete on 'data' typing than LobbyPage.
+        // Assuming data structure match.
+        if (data.isTeamCorrect) {
+          playSFX(getAudioForLevel(level, 'win'));
+        } else {
+          playSFX(getAudioForLevel(level, 'lose'));
+        }
+
         if (data.playerAnswers && setGameData) {
           fetch(`${API_BASE_URL}/api/games/${roomCode}/players`)
             .then(res => res.json())
@@ -107,6 +122,11 @@ const GamePage: React.FC = () => {
         setCurrentQuestion(data);
         setAnswerSubmitted(false);
         setQuestionError(undefined);
+
+        // Audio: Background Loop
+        const level = (data as any).level || 1;
+        playTrack(getAudioForLevel(level, 'question'), true);
+
         if (setGameData) {
           setGameData(prev => {
             if (!prev) return null;
@@ -174,6 +194,10 @@ const GamePage: React.FC = () => {
       try {
         await submitAnswer(roomCode, currentQuestion.id.toString(), answer);
         setAnswerSubmitted(true);
+        // Audio: Final Answer
+        const level = currentQuestion.level || 1;
+        playSFX(getAudioForLevel(level, 'final_answer'));
+
         const response = await fetch(`${API_BASE_URL}/api/games/${roomCode}/players`);
         if (response.ok) {
           const players = await response.json();
