@@ -19,7 +19,7 @@ const LanguageSwitcher: React.FC = () => {
             title="Switch Language"
         >
             <span className="flag-icon">{flags[language]}</span>
-            <span className="lang-code">{language.toUpperCase()}</span>
+
         </button>
     );
 };
