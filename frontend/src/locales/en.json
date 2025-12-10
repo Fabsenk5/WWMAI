@@ -17,5 +17,9 @@
     "host_controls": "Host Controls",
     "kick": "Kick",
     "end_game": "End Game",
-    "pause_game": "Pause Game"
+    "pause_game": "Pause Game",
+    "welcome_message": "Welcome to Who Wants to be a Millionaire!",
+    "choose_option": "Choose an option to begin:",
+    "create_game": "Create New Game",
+    "join_game": "Join Game"
 }
