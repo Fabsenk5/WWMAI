@@ -5,6 +5,7 @@ CREATE TABLE questions (
     question TEXT NOT NULL,
     correct_answer TEXT NOT NULL,
     incorrect_answers TEXT[] NOT NULL,
+    translations JSONB DEFAULT '{}', -- Store translations for the question
     CONSTRAINT unique_question UNIQUE (category, question, difficulty) -- Add a unique constraint to prevent duplicate questions
 );
 

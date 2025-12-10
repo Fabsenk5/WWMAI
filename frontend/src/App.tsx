@@ -16,6 +16,8 @@ import UpgradePage from './pages/UpgradePage'; // Import UpgradePage
 import { ModalProvider } from './context/ModalContext';
 import { AudioProvider } from './context/AudioContext';
 import AudioPlayer from './components/AudioPlayer';
+import { LanguageProvider } from './context/LanguageContext';
+import LanguageSwitcher from './components/LanguageSwitcher';
 
 import ProtectedRoute from './components/ProtectedRoute';
 
@@ -27,31 +29,34 @@ function App() {
   return (
     <ModalProvider>
       <AudioProvider>
-        <div className="App">
-          <AudioPlayer />
-          <UserIcon />
-          <Branding />
-          <ThemeToggle />
-          <div className="main-content">
-            <Routes>
-              <Route path="/" element={<HomePage />} />
-              <Route path="/create-game" element={<CreateGamePage />} />
-              <Route path="/join" element={<JoinGamePage />} />
-              <Route path="/lobby/:roomCode" element={<LobbyPage />} />
-              <Route path="/game/:id" element={<GamePage />} />
+        <LanguageProvider>
+          <div className="App">
+            <AudioPlayer />
+            <UserIcon />
+            <LanguageSwitcher />
+            <Branding />
+            <ThemeToggle />
+            <div className="main-content">
+              <Routes>
+                <Route path="/" element={<HomePage />} />
+                <Route path="/create-game" element={<CreateGamePage />} />
+                <Route path="/join" element={<JoinGamePage />} />
+                <Route path="/lobby/:roomCode" element={<LobbyPage />} />
+                <Route path="/game/:id" element={<GamePage />} />
 
-              {/* Auth Routes */}
-              <Route path="/login" element={<LoginPage />} />
-              <Route path="/register" element={<RegisterPage />} />
-              <Route path="/profile" element={<ProfilePage />} />
-              <Route path="/upgrade" element={<UpgradePage />} />
+                {/* Auth Routes */}
+                <Route path="/login" element={<LoginPage />} />
+                <Route path="/register" element={<RegisterPage />} />
+                <Route path="/profile" element={<ProfilePage />} />
+                <Route path="/upgrade" element={<UpgradePage />} />
 
-              {/* Admin Routes */}
-              <Route path="/admin" element={<AdminLogin />} />
-              <Route path="/admin/dashboard" element={<AdminDashboard />} />
-            </Routes>
+                {/* Admin Routes */}
+                <Route path="/admin" element={<AdminLogin />} />
+                <Route path="/admin/dashboard" element={<AdminDashboard />} />
+              </Routes>
+            </div>
           </div>
-        </div>
+        </LanguageProvider>
       </AudioProvider>
     </ModalProvider>
   );

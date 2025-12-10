@@ -16,14 +16,20 @@ interface QuestionDisplayProps {
     isHost?: boolean; // Add flag to indicate if the viewer is the host/operator
 }
 
+import { useLanguage } from '../context/LanguageContext';
+
+// ... (interfaces)
+
 const QuestionDisplay: React.FC<QuestionDisplayProps> = ({
     question,
     onSubmit,
     showCorrectAnswer,
     errorMessage,
     onRefresh,
-    isHost = false // Default to false (player mode)
+    isHost = false
 }) => {
+    const { language } = useLanguage();
+
     if (errorMessage) {
         return (
             <div className="error-message">
@@ -52,32 +58,42 @@ const QuestionDisplay: React.FC<QuestionDisplayProps> = ({
         );
     }
 
-    const handleAnswerClick = (answer: string) => {
-        if (!isHost) { // Only submit answers if not the host
-            onSubmit(answer);
+    // Determine Question Text
+    // The backend now sends questionTranslations { en: "...", de: "..." }
+    // We cast question to any to access dynamic props not yet in interface
+    const q: any = question;
+    const displayText = (q.questionTranslations && q.questionTranslations[language])
+        ? q.questionTranslations[language]
+        : q.question;
+
+    const handleAnswerClick = (answerEn: string) => {
+        if (!isHost) {
+            onSubmit(answerEn);
         }
     };
 
     return (
         <div className="question-display">
-            <h2 className="question-text">{question.question}</h2>
+            <h2 className="question-text">{displayText}</h2>
             <div className="options-grid">
-                {(question.options || []).map((option, index) => (
-                    isHost ? (
-                        // For host: render div elements that look like buttons but aren't clickable
-                        <div
-                            key={index}
-                            className="option-button-host"
-                        >
-                            {option}
+                {(question.options || []).map((option: any, index: number) => {
+                    // Option can be string (legacy) or object { text, translations }
+                    const isLegacy = typeof option === 'string';
+                    const optionEn = isLegacy ? option : option.text;
+                    const optionDisplay = isLegacy
+                        ? option
+                        : (option.translations && option.translations[language] ? option.translations[language] : option.text);
+
+                    return isHost ? (
+                        <div key={index} className="option-button-host">
+                            {optionDisplay}
                         </div>
                     ) : (
-                        // For players: render actual clickable buttons
-                        <button key={index} onClick={() => handleAnswerClick(option)} className="option-button-player">
-                            {option}
+                        <button key={index} onClick={() => handleAnswerClick(optionEn)} className="option-button-player">
+                            {optionDisplay}
                         </button>
-                    )
-                ))}
+                    );
+                })}
             </div>
             {showCorrectAnswer && question.correctAnswer && (
                 <div className="correct-answer-banner">

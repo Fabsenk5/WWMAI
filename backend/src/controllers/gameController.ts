@@ -78,19 +78,30 @@ export class GameController {
             `;
             await this.db.query(updateGameQuery, [nextLevel, nextQuestion.id, gameId]);
 
-            // Prepare question data for clients (without correct answer)
+            // Prepare rich options (shuffled with translations)
             const options = this.getConsistentOptions(
                 nextQuestion.id,
-                [...nextQuestion.incorrect_answers, nextQuestion.correct_answer]
+                [...nextQuestion.incorrect_answers, nextQuestion.correct_answer],
+                nextQuestion.translations
             );
+
+            // Extract question text translations
+            const questionTranslations: Record<string, string> = {};
+            if (nextQuestion.translations) {
+                for (const [lang, data] of Object.entries(nextQuestion.translations) as [string, any][]) {
+                    questionTranslations[lang] = data.question;
+                }
+            }
+
             const questionToSendToSocket = {
                 id: nextQuestion.id,
                 category: nextQuestion.category,
                 difficulty: nextQuestion.difficulty,
                 question: nextQuestion.question,
+                questionTranslations: questionTranslations, // Safe translations for question text only
                 level: nextLevel,
-                prize: getPrizeForLevel(nextLevel), // Use the standalone function directly
-                options: options
+                prize: getPrizeForLevel(nextLevel),
+                options: options // Now containing { text, translations } objects
             };
 
             // Emit newQuestion event
@@ -103,19 +114,42 @@ export class GameController {
         }
     }
 
-    // A method to get consistent options for a question based on question ID
-    private getConsistentOptions(questionId: number, options: string[]): string[] {
-        // Use a simple but deterministic shuffle algorithm based on question ID
-        const sortedOptions = [...options]; // Make a copy to avoid modifying the original
+    private getConsistentOptions(questionId: number, options: string[], translations: any): any[] {
+        let richOptions: any[] = [];
+        const incorrectCount = options.length - 1; // Last one is correct
 
-        // Simple seeded Fisher-Yates shuffle
+        // Map Incorrect
+        for (let i = 0; i < incorrectCount; i++) {
+            const enText = options[i];
+            const trans: Record<string, string> = {};
+            if (translations) {
+                for (const [lang, data] of Object.entries(translations) as [string, any][]) {
+                    if (data.incorrect_answers && data.incorrect_answers[i]) {
+                        trans[lang] = data.incorrect_answers[i];
+                    }
+                }
+            }
+            richOptions.push({ text: enText, translations: trans });
+        }
+
+        // Map Correct
+        const correctText = options[incorrectCount];
+        const correctTrans: Record<string, string> = {};
+        if (translations) {
+            for (const [lang, data] of Object.entries(translations) as [string, any][]) {
+                if (data.correct_answer) {
+                    correctTrans[lang] = data.correct_answer;
+                }
+            }
+        }
+        richOptions.push({ text: correctText, translations: correctTrans });
+
+        // Shuffle
+        const sortedOptions = [...richOptions];
         const seed = questionId;
         for (let i = sortedOptions.length - 1; i > 0; i--) {
-            // Use a simple hash function based on the seed and current index
             const hash = (seed * 9301 + i * 49297) % 233280;
             const j = hash % (i + 1);
-
-            // Swap elements
             [sortedOptions[i], sortedOptions[j]] = [sortedOptions[j], sortedOptions[i]];
         }
 
@@ -489,13 +523,25 @@ export class GameController {
                 WHERE room_code = $2
             `, [questionId, roomCode]);
 
-            const options = this.getConsistentOptions(questionId, [...(firstQuestion.incorrect_answers || []), firstQuestion.correct_answer]);
+            const options = this.getConsistentOptions(
+                questionId,
+                [...(firstQuestion.incorrect_answers || []), firstQuestion.correct_answer],
+                firstQuestion.translations
+            );
+
+            const questionTranslations: Record<string, string> = {};
+            if (firstQuestion.translations) {
+                for (const [lang, data] of Object.entries(firstQuestion.translations) as [string, any][]) {
+                    questionTranslations[lang] = data.question;
+                }
+            }
 
             const questionData = {
                 id: questionId,
                 category: firstQuestion.category,
                 difficulty: firstQuestion.difficulty,
                 question: firstQuestion.question,
+                questionTranslations: questionTranslations,
                 level: 1,
                 prize: getPrizeForLevel(1),
                 options: options
@@ -616,14 +662,23 @@ export class GameController {
 
         const options = this.getConsistentOptions(
             questionIdForSocket,
-            [...(firstQuestion.incorrect_answers || []), firstQuestion.correct_answer]
+            [...(firstQuestion.incorrect_answers || []), firstQuestion.correct_answer],
+            firstQuestion.translations
         );
+
+        const questionTranslations: Record<string, string> = {};
+        if (firstQuestion.translations) {
+            for (const [lang, data] of Object.entries(firstQuestion.translations) as [string, any][]) {
+                questionTranslations[lang] = data.question;
+            }
+        }
 
         const questionToSendToSocket = {
             id: questionIdForSocket,
             category: firstQuestion.category,
             difficulty: firstQuestion.difficulty,
             question: firstQuestion.question,
+            questionTranslations: questionTranslations, // Add translations
             level: 1, // current_level was set to 1
             prize: getPrizeForLevel(1), // Use the standalone function directly
             options: options
@@ -976,7 +1031,11 @@ export class GameController {
                 if (difficulty === 'hard') correctChance = 0.75; // Hard: 75%
                 if (difficulty === 'very_hard') correctChance = 0.6; // Very Hard: 60%
 
-                const options = this.getConsistentOptions(question.id, [...question.incorrect_answers, question.correct_answer]);
+                const options = this.getConsistentOptions(
+                    question.id,
+                    [...question.incorrect_answers, question.correct_answer],
+                    question.translations
+                );
                 const stats: Record<string, number> = {};
                 let remaining = 100;
 
@@ -984,23 +1043,23 @@ export class GameController {
                 const correctVote = Math.random() < correctChance ? Math.floor(correctChance * 100) : Math.floor(Math.random() * 40);
 
                 // Assign votes
-                options.forEach(opt => {
-                    if (opt === question.correct_answer) {
-                        stats[opt] = correctVote;
+                options.forEach((opt: any) => {
+                    if (opt.text === question.correct_answer) {
+                        stats[opt.text] = correctVote;
                         remaining -= correctVote;
                     } else {
-                        stats[opt] = 0; // Init
+                        stats[opt.text] = 0; // Init
                     }
                 });
 
                 // Distribute remaining
-                const otherOptions = options.filter(o => o !== question.correct_answer);
-                otherOptions.forEach((opt, idx) => {
+                const otherOptions = options.filter((o: any) => o.text !== question.correct_answer);
+                otherOptions.forEach((opt: any, idx: number) => {
                     if (idx === otherOptions.length - 1) {
-                        stats[opt] = remaining;
+                        stats[opt.text] = remaining;
                     } else {
                         const val = Math.floor(Math.random() * remaining);
-                        stats[opt] = val;
+                        stats[opt.text] = val;
                         remaining -= val;
                     }
                 });
@@ -1209,14 +1268,23 @@ export class GameController {
                     // Get consistent options for this question
                     const options = this.getConsistentOptions(
                         questionId,
-                        [...newQuestion.incorrect_answers, newQuestion.correct_answer]
+                        [...newQuestion.incorrect_answers, newQuestion.correct_answer],
+                        newQuestion.translations
                     );
+
+                    const questionTranslations: Record<string, string> = {};
+                    if (newQuestion.translations) {
+                        for (const [lang, data] of Object.entries(newQuestion.translations) as [string, any][]) {
+                            questionTranslations[lang] = data.question;
+                        }
+                    }
 
                     const questionToSend = {
                         id: questionId,
                         category: newQuestion.category,
                         difficulty: newQuestion.difficulty,
                         question: newQuestion.question,
+                        questionTranslations: questionTranslations,
                         level: current_level || 1,
                         prize: getPrizeForLevel(current_level || 1),
                         options: options,
@@ -1264,14 +1332,23 @@ export class GameController {
                 // Continue with the new question
                 const options = this.getConsistentOptions(
                     questionId,
-                    [...newQuestion.incorrect_answers, newQuestion.correct_answer]
+                    [...newQuestion.incorrect_answers, newQuestion.correct_answer],
+                    newQuestion.translations
                 );
+
+                const questionTranslations: Record<string, string> = {};
+                if (newQuestion.translations) {
+                    for (const [lang, data] of Object.entries(newQuestion.translations) as [string, any][]) {
+                        questionTranslations[lang] = data.question;
+                    }
+                }
 
                 const recoveredQuestion = {
                     id: questionId,
                     category: newQuestion.category,
                     difficulty: newQuestion.difficulty,
                     question: newQuestion.question,
+                    questionTranslations: questionTranslations,
                     level: current_level,
                     prize: getPrizeForLevel(current_level),
                     options: options,
@@ -1290,14 +1367,23 @@ export class GameController {
             // Get consistent options order based on question ID
             const options = this.getConsistentOptions(
                 question.id,
-                [...question.incorrect_answers, question.correct_answer]
+                [...question.incorrect_answers, question.correct_answer],
+                question.translations
             );
+
+            const questionTranslations: Record<string, string> = {};
+            if (question.translations) {
+                for (const [lang, data] of Object.entries(question.translations) as [string, any][]) {
+                    questionTranslations[lang] = data.question;
+                }
+            }
 
             const questionToSend = {
                 id: question.id,
                 category: question.category,
                 difficulty: question.difficulty,
                 question: question.question,
+                questionTranslations: questionTranslations,
                 level: current_level,
                 prize: getPrizeForLevel(current_level),
                 options: options,

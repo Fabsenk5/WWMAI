@@ -13,6 +13,11 @@ interface GeneratedQuestion {
     correct_answer: string;
     incorrect_answers: string[];
     difficulty: 'easy' | 'medium' | 'hard' | 'very_hard';
+    translations: {
+        de: { question: string; correct_answer: string; incorrect_answers: string[] };
+        ru: { question: string; correct_answer: string; incorrect_answers: string[] };
+        es: { question: string; correct_answer: string; incorrect_answers: string[] };
+    };
 }
 
 export class AiService {
@@ -63,6 +68,11 @@ export class AiService {
 
             const prompt = `
                 Generate ${amountToGenerate} unique trivia questions for the category "${category}".
+                
+                CRITICAL CULTURAL INSTRUCTION:
+                Prioritize questions with **International** relevance first, then **European** relevance, then **German** relevance.
+                Avoid questions that are too obscure or US-centric.
+
                 Create questions with varying difficulties based on this mapping:
                 - ${easyCount} Easy questions (Levels 1-4)
                 - ${mediumCount} Medium questions (Levels 5-9)
@@ -71,10 +81,15 @@ export class AiService {
 
                 Return the output strictly as a JSON array of objects with this format:
                 {
-                    "question": "The question text",
-                    "correct_answer": "The correct answer",
-                    "incorrect_answers": ["Wrong 1", "Wrong 2", "Wrong 3"],
-                    "difficulty": "easy" | "medium" | "hard" | "very_hard"
+                    "question": "The question text (English)",
+                    "correct_answer": "The correct answer (English)",
+                    "incorrect_answers": ["Wrong 1", "Wrong 2", "Wrong 3"] (English),
+                    "difficulty": "easy" | "medium" | "hard" | "very_hard",
+                    "translations": {
+                        "de": { "question": "German Q", "correct_answer": "German A", "incorrect_answers": ["German W1", "German W2", "German W3"] },
+                        "ru": { "question": "Russian Q", "correct_answer": "Russian A", "incorrect_answers": ["Russian W1", "Russian W2", "Russian W3"] },
+                        "es": { "question": "Spanish Q", "correct_answer": "Spanish A", "incorrect_answers": ["Spanish W1", "Spanish W2", "Spanish W3"] }
+                    }
                 }
                 Ensure the JSON is valid and contains no markdown formatting.
             `;
@@ -130,15 +145,16 @@ export class AiService {
 
                 if (checkRes.rows.length === 0) {
                     const insertQuery = `
-                        INSERT INTO questions (category, difficulty, question, correct_answer, incorrect_answers)
-                        VALUES ($1, $2, $3, $4, $5)
+                        INSERT INTO questions (category, difficulty, question, correct_answer, incorrect_answers, translations)
+                        VALUES ($1, $2, $3, $4, $5, $6)
                     `;
                     await this.db.query(insertQuery, [
                         category,
                         diff,
                         q.question,
                         q.correct_answer,
-                        q.incorrect_answers
+                        q.incorrect_answers,
+                        JSON.stringify(q.translations)
                     ]);
                     insertedCount++;
                 }
@@ -148,6 +164,83 @@ export class AiService {
 
         } catch (error) {
             console.error(`[AiService] ❌ Error ensuring pool for category "${category}":`, error);
+        }
+    }
+
+    public async backfillTranslations(limit: number = 50): Promise<void> {
+        if (!this.genAI) {
+            console.warn('[AiService] No API Key. Cannot backfill translations.');
+            return;
+        }
+
+        try {
+            // Find questions with missing translations
+            // Assuming "missing" means NULL or empty object '{}' or undefined
+            const query = `
+                SELECT id, question, correct_answer, incorrect_answers 
+                FROM questions 
+                WHERE translations IS NULL OR translations::text = '{}' 
+                LIMIT $1
+            `;
+            const res = await this.db.query(query, [limit]);
+            const questionsToBackfill = res.rows;
+
+            if (questionsToBackfill.length === 0) {
+                console.log('[AiService] No questions found needing translation backfill.');
+                return;
+            }
+
+            console.log(`[AiService] Found ${questionsToBackfill.length} questions to backfill.`);
+
+            // Process in batches of 5 to avoid huge prompts but keep reasonable speed
+            const batchSize = 5;
+            for (let i = 0; i < questionsToBackfill.length; i += batchSize) {
+                const batch = questionsToBackfill.slice(i, i + batchSize);
+
+                const prompt = `
+                    Translate the following trivia questions into German (de), Russian (ru), and Spanish (es).
+                    Input Questions:
+                    ${JSON.stringify(batch)}
+
+                    Return a JSON array of objects, where each object corresponds to an input question and contains ONLY the translations map.
+                    The order must match the input array.
+                    
+                    Format:
+                    [
+                        {
+                            "id": <original_id>,
+                            "translations": {
+                                "de": { "question": "...", "correct_answer": "...", "incorrect_answers": [...] },
+                                "ru": { ... },
+                                "es": { ... }
+                            }
+                        }
+                    ]
+                `;
+
+                try {
+                    const model = this.genAI.getGenerativeModel({ model: "gemini-2.5-flash-preview-09-2025" });
+                    const result = await model.generateContent(prompt);
+                    const responseText = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
+                    const translatedBatch = JSON.parse(responseText);
+
+                    for (const item of translatedBatch) {
+                        if (item.id && item.translations) {
+                            await this.db.query(
+                                `UPDATE questions SET translations = $1 WHERE id = $2`,
+                                [JSON.stringify(item.translations), item.id]
+                            );
+                            console.log(`[AiService] Updated translations for question ID: ${item.id}`);
+                        }
+                    }
+                } catch (err) {
+                    console.error(`[AiService] Error processing batch starting at index ${i}:`, err);
+                }
+            }
+            console.log('[AiService] Backfill complete.');
+
+        } catch (error) {
+            console.error('[AiService] Error in backfillTranslations:', error);
         }
     }
 }

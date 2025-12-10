@@ -1,0 +1,21 @@
+{
+    "welcome": "Welcome",
+    "start_game": "Start Game",
+    "score": "Score",
+    "game_over": "Game Over",
+    "correct": "Correct!",
+    "incorrect": "Wrong!",
+    "next_question": "Next Question",
+    "lives": "Lives",
+    "mode": "Mode",
+    "room_code": "Room Code",
+    "level": "Level",
+    "waiting_for_host": "Waiting for host to start...",
+    "waiting_for_players": "Waiting for other players...",
+    "you_died": "You have been eliminated.",
+    "spectating": "Spectating",
+    "host_controls": "Host Controls",
+    "kick": "Kick",
+    "end_game": "End Game",
+    "pause_game": "Pause Game"
+}

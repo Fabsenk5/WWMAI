@@ -1,0 +1,21 @@
+{
+    "welcome": "Bienvenido",
+    "start_game": "Comenzar juego",
+    "score": "Puntuación",
+    "game_over": "Juego terminado",
+    "correct": "¡Correcto!",
+    "incorrect": "¡Incorrecto!",
+    "next_question": "Siguiente pregunta",
+    "lives": "Vidas",
+    "mode": "Modo",
+    "room_code": "Código de sala",
+    "level": "Nivel",
+    "waiting_for_host": "Esperando al anfitrión...",
+    "waiting_for_players": "Esperando a otros jugadores...",
+    "you_died": "Has sido eliminado.",
+    "spectating": "Espectador",
+    "host_controls": "Controles del anfitrión",
+    "kick": "Expulsar",
+    "end_game": "Terminar juego",
+    "pause_game": "Pausar juego"
+}

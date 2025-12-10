@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useContext, useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useParams } from 'react-router-dom';
 import { GameContext, Question } from '../context/GameContext';
 import { useModal } from '../context/ModalContext';
@@ -10,6 +11,7 @@ import io from 'socket.io-client';
 import '../styles/Game.css';
 
 const GamePage: React.FC = () => {
+  const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const { showAlert } = useModal();
   const { playTrack, playSFX, getAudioForLevel, stopAll } = useAudio();
@@ -254,32 +256,33 @@ const GamePage: React.FC = () => {
     }
   };
 
-  if (loading) return <div className="loading-message">Loading game data...</div>;
-  if (error) return <div className="error-message">Error loading game: {error}</div>;
-  if (!gameData) return <div className="error-message">Game data not found.</div>;
-  if (answerSubmitted) return <div className="loading-message">Answer submitted. Waiting for other players...</div>;
+
+  if (loading) return <div className="loading-message">{t('loading')}</div>;
+  if (error) return <div className="error-message">{t('error')}: {error}</div>;
+  if (!gameData) return <div className="error-message">{t('error')}</div>;
+  if (answerSubmitted) return <div className="loading-message">{t('waiting_for_players')}</div>;
 
   return (
     <div className="game-page-container">
       <div className="game-header">
-        <h1>Game Page</h1>
+        <h1>{t('game_page')}</h1>
         <div className="game-info-item">
           <span className="game-mode-badge">
-            Mode: {gameData?.game_mode === 'survival' ? '🔥 Survival' : '🤝 Cooperative'}
+            {t('mode')}: {gameData?.game_mode === 'survival' ? '🔥 Survival' : '🤝 Cooperative'}
           </span>
-          <span>Game ID: {id}</span>
+          <span>ID: {id}</span>
         </div>
       </div>
 
       <div className="game-info-bar">
-        <div className="game-info-item">Room Code: <strong>{roomCode}</strong></div>
-        <div className="game-info-item">Current Level: <strong>{gameData?.current_level}</strong></div>
+        <div className="game-info-item">{t('room_code')}: <strong>{roomCode}</strong></div>
+        <div className="game-info-item">{t('level')}: <strong>{gameData?.current_level}</strong></div>
       </div>
 
       {gameEnded ? (
-        <h2>Game Over</h2>
+        <h2>{t('game_over')}</h2>
       ) : gameData?.status !== 'started' ? (
-        <button onClick={startGame} className="button">Start Game</button>
+        <button onClick={startGame} className="button">{t('start_game')}</button>
       ) : (
         <QuestionDisplay
           question={currentQuestion}
