@@ -149,6 +149,7 @@ const LobbyPage: React.FC = () => {
       setAnswerSubmitted(false);
       setSelectedAnswer(null);
       setWaitingForCount(null);
+      setJokerResult(null);
 
       // Audio: Play background loop for level
       // If it's level 1, play "Let's Play" first? Or just loop question theme.
@@ -492,7 +493,7 @@ const LobbyPage: React.FC = () => {
                     <button
                       key={joker.type}
                       onClick={() => handleUseJoker(joker.type)}
-                      disabled={isUsed || !!jokerResult?.wrongAnswersToRemove}
+                      disabled={isUsed}
                       className="joker-button"
                       style={{ opacity: isUsed ? 0.6 : 1 }}
                     >
