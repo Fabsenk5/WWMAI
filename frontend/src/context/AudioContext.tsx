@@ -5,6 +5,8 @@ interface AudioContextType {
     volume: number;
     togglePlay: () => void;
     setVolume: (vol: number) => void;
+    isMuted: boolean;
+    toggleMute: () => void;
     currentTrack: string;
     playTrack: (trackName: string, loop?: boolean) => void;
     playSFX: (trackName: string) => void;
@@ -17,8 +19,12 @@ const AudioContext = createContext<AudioContextType | undefined>(undefined);
 export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [isPlaying, setIsPlaying] = useState(false);
     const [volume, setVolumeState] = useState(0.5);
+    const [isMuted, setIsMuted] = useState(false); // Add mute state
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const [currentTrack] = useState('/assets/audio/background_loop.mp3');
+
+    // Master volume multiplier to reduce overall loudness
+    const MASTER_VOLUME = 0.5;
 
     // Initialize audio element
     useEffect(() => {
@@ -41,9 +47,9 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     // Sync volume to active track
     useEffect(() => {
         if (audioRef.current) {
-            audioRef.current.volume = volume;
+            audioRef.current.volume = isMuted ? 0 : (volume * MASTER_VOLUME);
         }
-    }, [volume]);
+    }, [volume, isMuted]);
 
     const playTrack = (trackName: string, loop: boolean = true) => {
         try {
@@ -53,7 +59,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             const path = `/assets/audio/${trackName}`;
             const audio = new Audio(path);
             audio.loop = loop;
-            audio.volume = volume;
+            audio.volume = isMuted ? 0 : (volume * MASTER_VOLUME);
             audio.play().catch(e => console.warn(`[Audio] Failed to play track ${trackName}:`, e));
             audioRef.current = audio;
             setIsPlaying(true);
@@ -67,7 +73,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             const path = `/assets/audio/${trackName}`;
             const audio = new Audio(path);
             audio.loop = false;
-            audio.volume = volume; // Use global volume
+            audio.volume = isMuted ? 0 : (volume * MASTER_VOLUME); // Use global volume
             audio.play().catch(e => console.warn(`[Audio] Failed to play SFX ${trackName}:`, e));
         } catch (err) {
             console.error('[Audio] Error in playSFX:', err);
@@ -94,13 +100,19 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
     };
 
+    const toggleMute = () => {
+        setIsMuted(prev => !prev);
+    };
+
     const setVolume = (vol: number) => {
         const clamped = Math.max(0, Math.min(1, vol));
         setVolumeState(clamped);
-        if (audioRef.current) {
-            audioRef.current.volume = clamped;
-        }
+        // Note: Actual volume setting on audio element happens in useEffect
         localStorage.setItem('wwmai_bgm_volume', clamped.toString());
+
+        // If user drags slider, ensuring we unmute if it was muted might be desired, 
+        // but for now keeping them separate as requested (toggle icon).
+        // Optionally: if (isMuted && vol > 0) setIsMuted(false); 
     };
 
     const getAudioForLevel = (level: number, type: 'question' | 'final_answer' | 'win' | 'lose'): string => {
@@ -173,7 +185,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     return (
-        <AudioContext.Provider value={{ isPlaying, volume, togglePlay, setVolume, currentTrack, playTrack, playSFX, stopAll, getAudioForLevel }}>
+        <AudioContext.Provider value={{ isPlaying, volume, togglePlay, setVolume, isMuted, toggleMute, currentTrack, playTrack, playSFX, stopAll, getAudioForLevel }}>
             {children}
         </AudioContext.Provider>
     );

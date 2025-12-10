@@ -43,10 +43,23 @@
     font-size: 0.9rem;
 }
 
+.volume-btn {
+    background: none;
+    border: none;
+    color: #ffd700;
+    font-size: 1.2rem;
+    cursor: pointer;
+    padding: 0 5px;
+    line-height: 1;
+    display: flex;
+    align-items: center;
+}
+
 .volume-slider {
     width: 60px;
     height: 4px;
     -webkit-appearance: none;
+    appearance: none;
     background: rgba(255, 255, 255, 0.3);
     border-radius: 2px;
     outline: none;
@@ -55,6 +68,7 @@
 
 .volume-slider::-webkit-slider-thumb {
     -webkit-appearance: none;
+    appearance: none;
     width: 12px;
     height: 12px;
     border-radius: 50%;
