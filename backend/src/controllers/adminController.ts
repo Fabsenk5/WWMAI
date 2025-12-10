@@ -243,4 +243,94 @@ export class AdminController {
             res.status(500).json({ error: 'Internal server error: ' + error.message });
         }
     }
+    /**
+     * Get all users
+     */
+    getAllUsers = async (req: Request, res: Response) => {
+        const password = req.body.password || req.query.password;
+        if (password !== this.adminPassword) {
+            res.status(401).json({ error: 'Unauthorized: Invalid password' });
+            return;
+        }
+
+        try {
+            const result = await this.db.query(
+                `SELECT id, username, email, subscription_status, subscription_end_date, created_at 
+                 FROM users 
+                 ORDER BY created_at DESC`
+            );
+            res.json(result.rows);
+        } catch (error) {
+            console.error('Error fetching users:', error);
+            res.status(500).json({ error: 'Failed to fetch users' });
+        }
+    }
+
+    /**
+     * Update user subscription status
+     */
+    updateUserStatus = async (req: Request, res: Response) => {
+        const { userId, status, password } = req.body;
+
+        if (password !== this.adminPassword) {
+            res.status(401).json({ error: 'Unauthorized: Invalid password' });
+            return;
+        }
+
+        if (!['free', 'premium'].includes(status)) {
+            res.status(400).json({ error: 'Invalid status' });
+            return;
+        }
+
+        try {
+            // If setting to free, we should probably clear the subscription_end_date
+            // If setting to premium, we might want to set it to null (permanent) or a date
+            // For now, we'll just toggle the status and clear date if free.
+
+            let query = "";
+            if (status === 'free') {
+                query = `UPDATE users SET subscription_status = $1, subscription_end_date = NULL WHERE id = $2 RETURNING id, username, email, subscription_status`;
+            } else {
+                query = `UPDATE users SET subscription_status = $1 WHERE id = $2 RETURNING id, username, email, subscription_status`;
+            }
+
+            const result = await this.db.query(query, [status, userId]);
+
+            if (result.rows.length === 0) {
+                res.status(404).json({ error: 'User not found' });
+                return;
+            }
+
+            res.json({ success: true, user: result.rows[0] });
+        } catch (error) {
+            console.error('Error updating user status:', error);
+            res.status(500).json({ error: 'Failed to update user status' });
+        }
+    }
+
+    /**
+     * Delete a user
+     */
+    deleteUser = async (req: Request, res: Response) => {
+        const { userId, password } = req.body;
+
+        if (password !== this.adminPassword) {
+            res.status(401).json({ error: 'Unauthorized: Invalid password' });
+            return;
+        }
+
+        try {
+            const result = await this.db.query('DELETE FROM users WHERE id = $1 RETURNING id', [userId]);
+
+            if (result.rows.length === 0) {
+                res.status(404).json({ error: 'User not found' });
+                return;
+            }
+
+            res.json({ success: true, message: 'User deleted successfully' });
+        } catch (error) {
+            console.error('Error deleting user:', error);
+            res.status(500).json({ error: 'Failed to delete user' });
+        }
+    }
 }

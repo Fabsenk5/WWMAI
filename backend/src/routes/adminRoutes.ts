@@ -16,6 +16,11 @@ export function createAdminRouter(pool: Pool): Router {
     router.get('/global-premium', adminController.getGlobalPremiumStatus);
     router.post('/global-premium', adminController.toggleGlobalPremiumStatus);
 
+    // User Management
+    router.get('/users', adminController.getAllUsers);
+    router.post('/users/status', adminController.updateUserStatus);
+    router.post('/users/delete', adminController.deleteUser);
+
 
     return router;
 }

@@ -114,3 +114,40 @@ export const grantUserPremium = async (identifier: string, type: 'email' | 'id',
     }
     return data;
 };
+
+export interface User {
+    id: number;
+    username: string;
+    email: string;
+    subscription_status: 'free' | 'premium';
+    subscription_end_date: string | null;
+    created_at: string;
+}
+
+export const getAllUsers = async (password: string): Promise<User[]> => {
+    const response = await fetch(`${API_URL}/users?password=${encodeURIComponent(password)}`);
+    if (!response.ok) throw new Error('Failed to fetch users');
+    return response.json();
+};
+
+export const updateUserStatus = async (userId: number, status: 'free' | 'premium', password: string): Promise<{ success: boolean; user: User }> => {
+    const response = await fetch(`${API_URL}/users/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, status, password }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to update user status');
+    return data;
+};
+
+export const deleteUser = async (userId: number, password: string): Promise<{ success: boolean; message: string }> => {
+    const response = await fetch(`${API_URL}/users/delete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId, password }),
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || 'Failed to delete user');
+    return data;
+};

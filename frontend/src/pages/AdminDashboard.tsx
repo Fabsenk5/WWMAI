@@ -7,9 +7,12 @@ import {
     deleteQuestion,
     getGlobalPremiumStatus,
     toggleGlobalPremiumStatus,
-    grantUserPremium,
+    getAllUsers,
+    updateUserStatus,
+    deleteUser,
     Question,
-    QuestionsResponse
+    QuestionsResponse,
+    User
 } from '../services/adminService';
 import '../styles/Forms.css';
 import '../styles/App.css';
@@ -39,8 +42,9 @@ const AdminDashboard: React.FC = () => {
     const [settingsMessage, setSettingsMessage] = useState('');
 
     // User Management State
-    const [grantEmail, setGrantEmail] = useState('');
-    const [grantMessage, setGrantMessage] = useState('');
+    const [users, setUsers] = useState<User[]>([]);
+    const [loadingUsers, setLoadingUsers] = useState(false);
+    const [userMessage, setUserMessage] = useState('');
 
     useEffect(() => {
         const storedPassword = localStorage.getItem('adminPassword');
@@ -59,9 +63,58 @@ const AdminDashboard: React.FC = () => {
     useEffect(() => {
         if (activeTab === 'questions') {
             fetchQuestions();
+        } else if (activeTab === 'users') {
+            fetchUsers();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [activeTab, page, filterCategory, filterDifficulty]);
+
+    const fetchUsers = async () => {
+        setLoadingUsers(true);
+        try {
+            const data = await getAllUsers(adminPassword);
+            setUsers(data);
+        } catch (error) {
+            console.error('Failed to load users', error);
+            setUserMessage('Failed to load users');
+        } finally {
+            setLoadingUsers(false);
+        }
+    };
+
+    const handleUpdateUserStatus = async (user: User) => {
+        const newStatus = user.subscription_status === 'premium' ? 'free' : 'premium';
+        const action = newStatus === 'premium' ? 'Preimium' : 'Free';
+        if (!window.confirm(`Are you sure you want to change ${user.username}'s status to ${action}?`)) return;
+
+        try {
+            const result = await updateUserStatus(user.id, newStatus, adminPassword);
+            if (result.success) {
+                setUsers(users.map(u => u.id === user.id ? result.user : u));
+                setUserMessage(`Updated ${user.username} to ${newStatus}`);
+                setTimeout(() => setUserMessage(''), 3000);
+            }
+        } catch (error) {
+            console.error('Error updating user status:', error);
+            setUserMessage('Failed to update status');
+        }
+    };
+
+    const handleDeleteUser = async (user: User) => {
+        if (!window.confirm(`Are you sure you want to PERMANENTLY DELETE user ${user.username} (${user.email})? This cannot be undone.`)) return;
+
+        try {
+            const result = await deleteUser(user.id, adminPassword);
+            if (result.success) {
+                setUsers(users.filter(u => u.id !== user.id));
+                setUserMessage(`Deleted user ${user.username}`);
+                setTimeout(() => setUserMessage(''), 3000);
+            }
+        } catch (error) {
+            console.error('Error deleting user:', error);
+            setUserMessage('Failed to delete user');
+        }
+    };
 
     const fetchCategories = async (pwd?: string) => {
         const passwordToUse = pwd || adminPassword;
@@ -167,20 +220,6 @@ const AdminDashboard: React.FC = () => {
             console.error('Error updating global premium status:', error);
             setSettingsMessage('Failed to update status');
         }
-    };
-
-    const handleGrantPremium = async () => {
-        if (!grantEmail) return;
-        if (!window.confirm(`Are you sure you want to grant PERMANENT premium status to ${grantEmail}?`)) return;
-
-        try {
-            const result = await grantUserPremium(grantEmail, 'email', adminPassword);
-            setGrantMessage(`Success: Premium granted to ${result.user?.username || grantEmail}`);
-            setGrantEmail('');
-        } catch (error: any) {
-            setGrantMessage(`Error: ${error.message}`);
-        }
-        setTimeout(() => setGrantMessage(''), 5000);
     };
 
     return (
@@ -367,38 +406,86 @@ const AdminDashboard: React.FC = () => {
                 {activeTab === 'users' && (
                     <div>
                         <h2>User Management</h2>
-                        <div style={{ padding: '20px', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)' }}>
-                            <h3>Grant Premium Status</h3>
-                            <p style={{ color: 'var(--text-secondary)' }}>
-                                Manually unlock premium features for a specific user. This updates their subscription status in the database.
-                            </p>
-
-                            <div className="form-group" style={{ maxWidth: '400px' }}>
-                                <label>User Email:</label>
-                                <input
-                                    type="email"
-                                    className="form-input"
-                                    value={grantEmail}
-                                    onChange={(e) => setGrantEmail(e.target.value)}
-                                    placeholder="user@example.com"
-                                />
+                        {userMessage && (
+                            <div className={`error-message ${userMessage.includes('Failed') ? '' : 'success'}`}
+                                style={{
+                                    borderColor: userMessage.includes('Failed') ? 'var(--danger-color)' : 'var(--success-color)',
+                                    marginBottom: '20px'
+                                }}>
+                                {userMessage}
                             </div>
+                        )}
 
-                            {grantMessage && (
-                                <div className={`error-message ${grantMessage.includes('Success') ? 'success' : ''}`}
-                                    style={{ borderColor: grantMessage.includes('Success') ? 'var(--success-color)' : '' }}>
-                                    {grantMessage}
-                                </div>
-                            )}
-
-                            <button
-                                className="btn form-submit-btn"
-                                style={{ marginTop: '10px' }}
-                                disabled={!grantEmail}
-                                onClick={handleGrantPremium}
-                            >
-                                Grant Premium
-                            </button>
+                        <div style={{ overflowX: 'auto' }}>
+                            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                                <thead>
+                                    <tr style={{ borderBottom: '2px solid var(--border-color)' }}>
+                                        <th style={{ padding: '10px' }}>ID</th>
+                                        <th style={{ padding: '10px' }}>Username</th>
+                                        <th style={{ padding: '10px' }}>Email</th>
+                                        <th style={{ padding: '10px' }}>Status</th>
+                                        <th style={{ padding: '10px' }}>Expiry</th>
+                                        <th style={{ padding: '10px' }}>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {loadingUsers ? (
+                                        <tr><td colSpan={6} style={{ padding: '20px', textAlign: 'center' }}>Loading...</td></tr>
+                                    ) : users.length === 0 ? (
+                                        <tr><td colSpan={6} style={{ padding: '20px', textAlign: 'center' }}>No users found</td></tr>
+                                    ) : (
+                                        users.map(user => (
+                                            <tr key={user.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                                                <td style={{ padding: '10px' }}>{user.id}</td>
+                                                <td style={{ padding: '10px' }}>{user.username}</td>
+                                                <td style={{ padding: '10px' }}>{user.email}</td>
+                                                <td style={{ padding: '10px' }}>
+                                                    <span style={{
+                                                        padding: '4px 8px',
+                                                        borderRadius: '4px',
+                                                        backgroundColor: user.subscription_status === 'premium' ? 'var(--primary-color)' : 'var(--bg-secondary)',
+                                                        color: user.subscription_status === 'premium' ? 'white' : 'var(--text-primary)',
+                                                        fontSize: '0.8em'
+                                                    }}>
+                                                        {user.subscription_status.toUpperCase()}
+                                                    </span>
+                                                </td>
+                                                <td style={{ padding: '10px' }}>
+                                                    {user.subscription_end_date ? new Date(user.subscription_end_date).toLocaleDateString() : 'N/A'}
+                                                </td>
+                                                <td style={{ padding: '10px', display: 'flex', gap: '10px' }}>
+                                                    <button
+                                                        className="btn"
+                                                        style={{
+                                                            padding: '4px 8px',
+                                                            fontSize: '0.8rem',
+                                                            backgroundColor: user.subscription_status === 'premium' ? 'var(--bg-secondary)' : 'var(--success-color)',
+                                                            color: user.subscription_status === 'premium' ? 'var(--text-primary)' : 'white',
+                                                            border: '1px solid var(--border-color)',
+                                                        }}
+                                                        onClick={() => handleUpdateUserStatus(user)}
+                                                    >
+                                                        {user.subscription_status === 'premium' ? 'Revert to Free' : 'Make Premium'}
+                                                    </button>
+                                                    <button
+                                                        className="btn"
+                                                        style={{
+                                                            padding: '4px 8px',
+                                                            fontSize: '0.8rem',
+                                                            backgroundColor: 'var(--danger-color)',
+                                                            color: 'white',
+                                                            border: 'none',
+                                                        }}
+                                                        onClick={() => handleDeleteUser(user)}
+                                                    >
+                                                        Delete
+                                                    </button>
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 )}
