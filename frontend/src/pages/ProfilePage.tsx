@@ -68,6 +68,41 @@ const ProfilePage: React.FC = () => {
                     </div>
                 )}
 
+                {/* Player Statistics */}
+                <div style={{ marginTop: '20px', padding: '15px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)' }}>
+                    <h3 style={{ marginTop: 0, marginBottom: '15px', borderBottom: '1px solid #444', paddingBottom: '5px' }}>Player Statistics</h3>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '15px' }}>
+                        <div>
+                            <div style={{ fontSize: '0.8em', color: '#aaa' }}>Games Played</div>
+                            <div style={{ fontSize: '1.2em', fontWeight: 'bold' }}>{user.games_played || 0}</div>
+                        </div>
+                        <div>
+                            <div style={{ fontSize: '0.8em', color: '#aaa' }}>Games Won</div>
+                            <div style={{ fontSize: '1.2em', fontWeight: 'bold' }}>{user.games_won || 0}</div>
+                        </div>
+                        <div>
+                            <div style={{ fontSize: '0.8em', color: '#aaa' }}>Win Rate</div>
+                            <div style={{ fontSize: '1.2em', fontWeight: 'bold' }}>
+                                {user.games_played ? ((user.games_won || 0) / user.games_played * 100).toFixed(1) : '0.0'}%
+                            </div>
+                        </div>
+                        <div>
+                            <div style={{ fontSize: '0.8em', color: '#aaa' }}>Total Earnings</div>
+                            <div style={{ fontSize: '1.2em', fontWeight: 'bold', color: '#4caf50' }}>
+                                €{(user.total_earnings || 0).toLocaleString('de-DE')}
+                            </div>
+                        </div>
+                        <div>
+                            <div style={{ fontSize: '0.8em', color: '#aaa' }}>Current Streak</div>
+                            <div style={{ fontSize: '1.2em', fontWeight: 'bold' }}>{user.current_win_streak || 0} 🔥</div>
+                        </div>
+                        <div>
+                            <div style={{ fontSize: '0.8em', color: '#aaa' }}>Best Streak</div>
+                            <div style={{ fontSize: '1.2em', fontWeight: 'bold' }}>{user.longest_win_streak || 0} 🏆</div>
+                        </div>
+                    </div>
+                </div>
+
                 {/* Avatar Display */}
                 <div style={{ marginTop: '20px' }}>
                     {user.avatar_url ? (

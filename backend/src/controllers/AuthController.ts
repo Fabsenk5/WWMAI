@@ -38,7 +38,7 @@ export class AuthController {
             const insertQuery = `
                 INSERT INTO users (username, email, password_hash)
                 VALUES ($1, $2, $3)
-                RETURNING id, username, email, subscription_status, created_at
+                RETURNING id, username, email, subscription_status, created_at, games_played, games_won, total_earnings, current_win_streak, longest_win_streak
             `;
             const result = await this.db.query(insertQuery, [username, email, passwordHash]);
             const user = result.rows[0];
@@ -115,7 +115,7 @@ export class AuthController {
                 return;
             }
 
-            const query = `SELECT id, username, email, subscription_status, created_at, avatar_url, subscription_end_date FROM users WHERE id = $1`;
+            const query = `SELECT id, username, email, subscription_status, created_at, avatar_url, subscription_end_date, games_played, games_won, total_earnings, current_win_streak, longest_win_streak FROM users WHERE id = $1`;
             const result = await this.db.query(query, [userId]);
 
             if (result.rows.length === 0) {

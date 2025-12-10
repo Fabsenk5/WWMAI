@@ -8,6 +8,11 @@ interface User {
     email: string;
     subscription_status: 'free' | 'premium';
     avatar_url?: string;
+    games_played?: number;
+    games_won?: number;
+    total_earnings?: number;
+    current_win_streak?: number;
+    longest_win_streak?: number;
 }
 
 interface AuthContextType {

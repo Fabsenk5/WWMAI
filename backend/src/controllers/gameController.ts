@@ -27,6 +27,53 @@ export class GameController {
     private io: SocketIOServer; // Add io property
     private aiService: AiService;
 
+    // Helper to update stats
+    private async finalizeGameStats(roomCode: string, gameMode: string, result: 'win' | 'loss', finalLevel: number): Promise<void> {
+        try {
+            const playersRes = await this.db.query('SELECT userId, score, lives FROM players WHERE room_code = $1', [roomCode]);
+            const prize = getPrizeForLevel(finalLevel); // For Co-op global prize
+
+            for (const p of playersRes.rows) {
+                if (!/^\d+$/.test(p.userid)) continue; // Skip guests
+
+                const uid = p.userid;
+                let isWinner = false;
+                let earnings = 0;
+
+                if (gameMode === 'survival') {
+                    isWinner = result === 'win' && p.lives > 0;
+                    earnings = p.score || 0;
+                } else {
+                    // Co-op
+                    isWinner = result === 'win';
+                    earnings = isWinner ? 1000000 : (p.score || prize); // Use Level prize for Co-op
+                }
+
+                if (isWinner) {
+                    await this.db.query(`
+                        UPDATE users SET 
+                            games_played = games_played + 1,
+                            games_won = games_won + 1,
+                            total_earnings = total_earnings + $1,
+                            current_win_streak = current_win_streak + 1,
+                            longest_win_streak = GREATEST(longest_win_streak, current_win_streak + 1)
+                        WHERE id = $2
+                    `, [earnings, uid]);
+                } else {
+                    await this.db.query(`
+                        UPDATE users SET 
+                            games_played = games_played + 1,
+                            total_earnings = total_earnings + $1,
+                            current_win_streak = 0
+                        WHERE id = $2
+                    `, [earnings, uid]);
+                }
+            }
+        } catch (e) {
+            console.error('Error finalizing stats:', e);
+        }
+    }
+
     // Helper method to advance to the next question
     private async advanceToNextQuestion(roomCode: string, gameId: number, currentLevel: number): Promise<void> {
         try {
@@ -39,6 +86,14 @@ export class GameController {
                 // Update game status to 'ended'
                 const endGameQuery = `UPDATE games SET status = 'ended', last_active = CURRENT_TIMESTAMP WHERE game_id = $1`;
                 await this.db.query(endGameQuery, [gameId]);
+
+                // Finalize Stats (Co-op Win or Survival Timeout Win?)
+                // Usually this flow is for Co-op max level. Survival might check separately.
+                // Assuming Co-op here since Survival usually loops in submitAnswer.
+                // But check gameMode first.
+                const gmRes = await this.db.query('SELECT game_mode FROM games WHERE game_id = $1', [gameId]);
+                const gm = gmRes.rows[0]?.game_mode || 'cooperative';
+                await this.finalizeGameStats(roomCode, gm, 'win', 15);
 
                 // Emit gameEnded event
                 this.io.to(roomCode).emit('gameEnded', { message: 'Game has ended. Maximum level reached.' });
@@ -815,10 +870,12 @@ export class GameController {
                         gameEnded = true;
                         message = 'Game Over! No survivors.';
                         await this.db.query(`UPDATE games SET status = 'ended' WHERE game_id = $1`, [gameId]);
+                        await this.finalizeGameStats(roomCode, 'survival', 'loss', current_level);
                     } else if (current_level >= 15) {
                         gameEnded = true;
                         message = 'Game Over! Victory!';
                         await this.db.query(`UPDATE games SET status = 'ended' WHERE game_id = $1`, [gameId]);
+                        await this.finalizeGameStats(roomCode, 'survival', 'win', current_level);
                     }
 
                     this.io.to(roomCode).emit('revealAnswers', {

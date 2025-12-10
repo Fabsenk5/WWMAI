@@ -435,7 +435,16 @@ const LobbyPage: React.FC = () => {
                 {gameData?.game_mode === 'survival' ? (
                   myResult ? (
                     <div style={{ fontSize: '1.2em', margin: '10px 0' }}>
-                      {t('your_answer')}: <strong>{myResult.answer}</strong>
+                      {t('your_answer')}: <strong>
+                        {(() => {
+                          // Lookup translation
+                          const opt = currentQuestion?.options?.find((o: any) => (typeof o === 'string' ? o : o.text) === myResult.answer);
+                          if (opt && typeof opt !== 'string' && opt.translations && opt.translations[language]) {
+                            return opt.translations[language];
+                          }
+                          return myResult.answer;
+                        })()}
+                      </strong>
                       <span style={{ marginLeft: '10px' }}>
                         {myResult.is_correct ? '✅' : '❌'}
                       </span>
@@ -445,7 +454,16 @@ const LobbyPage: React.FC = () => {
                   )
                 ) : (
                   <>
-                    {t('team_choice')}: <strong>{teamAnswerInfo.answer}</strong>
+                    {t('team_choice')}: <strong>
+                      {(() => {
+                        const ans = teamAnswerInfo.answer;
+                        const opt = currentQuestion?.options?.find((o: any) => (typeof o === 'string' ? o : o.text) === ans);
+                        if (opt && typeof opt !== 'string' && opt.translations && opt.translations[language]) {
+                          return opt.translations[language];
+                        }
+                        return ans;
+                      })()}
+                    </strong>
                     {teamAnswerInfo.isCorrect
                       ? <span className="text-success ml-2">✅</span>
                       : <span className="text-danger ml-2">❌</span>}
@@ -456,19 +474,37 @@ const LobbyPage: React.FC = () => {
           })()}
 
           <div className="correct-answer-box">
-            {t('correct_answer')}: <strong>{revealedAnswers.correctAnswer}</strong>
+            {t('correct_answer')}: <strong>
+              {(() => {
+                const ans = revealedAnswers.correctAnswer;
+                const opt = currentQuestion?.options?.find((o: any) => (typeof o === 'string' ? o : o.text) === ans);
+                if (opt && typeof opt !== 'string' && opt.translations && opt.translations[language]) {
+                  return opt.translations[language];
+                }
+                return ans;
+              })()}
+            </strong>
           </div>
 
           <p>{t('next_question_in')} {countdown}s...</p>
 
           <h3>{t('votes')}:</h3>
           <ul className="list-none">
-            {revealedAnswers.playerAnswers.map((pa, idx) => (
-              <li key={idx} className="border-bottom" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0' }}>
-                <span>{pa.name}: <strong>{pa.answer}</strong></span>
-                <span>{pa.is_correct ? '✅' : '❌'}</span>
-              </li>
-            ))}
+            {revealedAnswers.playerAnswers.map((pa, idx) => {
+              const displayAnswer = (() => {
+                const opt = currentQuestion?.options?.find((o: any) => (typeof o === 'string' ? o : o.text) === pa.answer);
+                if (opt && typeof opt !== 'string' && opt.translations && opt.translations[language]) {
+                  return opt.translations[language];
+                }
+                return pa.answer;
+              })();
+              return (
+                <li key={idx} className="border-bottom" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0' }}>
+                  <span>{pa.name}: <strong>{displayAnswer}</strong></span>
+                  <span>{pa.is_correct ? '✅' : '❌'}</span>
+                </li>
+              );
+            })}
           </ul>
         </div>
       )}
