@@ -17,5 +17,19 @@
     "host_controls": "Управление хоста",
     "kick": "Выгнать",
     "end_game": "Завершить игру",
-    "pause_game": "Пауза"
+    "pause_game": "Пауза",
+    "welcome_message": "Добро пожаловать в «Кто хочет стать миллионером»!",
+    "choose_option": "Выберите опцию, чтобы начать:",
+    "create_game": "Создать новую игру",
+    "join_game": "Присоединиться к игре",
+    "title_create_game": "Создать новую игру",
+    "title_join_game": "Присоединиться к игре",
+    "label_room_code": "Код комнаты:",
+    "label_your_name": "Ваше имя:",
+    "label_max_players": "Макс. игроков:",
+    "label_game_mode": "Режим игры:",
+    "btn_join": "Войти",
+    "btn_create": "Начать игру",
+    "btn_joining": "Вход...",
+    "btn_creating": "Создание..."
 }

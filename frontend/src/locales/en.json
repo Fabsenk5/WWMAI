@@ -21,5 +21,15 @@
     "welcome_message": "Welcome to Who Wants to be a Millionaire!",
     "choose_option": "Choose an option to begin:",
     "create_game": "Create New Game",
-    "join_game": "Join Game"
+    "join_game": "Join Game",
+    "title_create_game": "Create a New Game",
+    "title_join_game": "Join a Game",
+    "label_room_code": "Room Code:",
+    "label_your_name": "Your Name:",
+    "label_max_players": "Max Players:",
+    "label_game_mode": "Game Mode:",
+    "btn_join": "Join Game",
+    "btn_create": "Start Game",
+    "btn_joining": "Joining...",
+    "btn_creating": "Creating Game..."
 }

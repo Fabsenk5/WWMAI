@@ -5,8 +5,10 @@ import axios from 'axios'; // Import axios
 import '../styles/Forms.css'; // Import shared form styles
 
 import { API_BASE_URL } from '../config/api';
+import { useTranslation } from 'react-i18next';
 
 const JoinGamePage: React.FC = () => {
+    const { t } = useTranslation();
     const [roomCode, setRoomCode] = useState('');
     const [userName, setUserName] = useState(''); // Rename playerName to userName
     // Use context for state management
@@ -69,10 +71,10 @@ const JoinGamePage: React.FC = () => {
 
     return (
         <div className="form-page-container">
-            <h1>Join a Game</h1>
+            <h1>{t('title_join_game')}</h1>
             <form onSubmit={handleJoinGame}>
                 <div className="form-group">
-                    <label htmlFor="roomCode">Room Code:</label>
+                    <label htmlFor="roomCode">{t('label_room_code')}</label>
                     <input
                         type="text"
                         id="roomCode"
@@ -84,7 +86,7 @@ const JoinGamePage: React.FC = () => {
                     />
                 </div>
                 <div className="form-group">
-                    <label htmlFor="userName">Your Name:</label>
+                    <label htmlFor="userName">{t('label_your_name')}</label>
                     <input
                         type="text"
                         id="userName"
@@ -96,7 +98,7 @@ const JoinGamePage: React.FC = () => {
                     />
                 </div>
                 <button type="submit" disabled={loading} className="form-submit-btn">
-                    {loading ? 'Joining...' : 'Join Game'}
+                    {loading ? t('btn_joining') : t('btn_join')}
                 </button>
             </form>
             {/* Display local form errors or context errors */}

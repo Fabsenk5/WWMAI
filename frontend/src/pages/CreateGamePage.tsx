@@ -5,8 +5,10 @@ import { useAuth } from '../context/AuthContext';
 import '../styles/Forms.css';
 import { API_BASE_URL } from '../config/api';
 import { getPublicGlobalPremiumStatus } from '../services/adminService';
+import { useTranslation } from 'react-i18next';
 
 const CreateGamePage: React.FC = () => {
+    const { t } = useTranslation();
     const { user } = useAuth();
     const [userCount, setUserCount] = useState(2);
     const [gameMode, setGameMode] = useState('cooperative');
@@ -104,10 +106,10 @@ const CreateGamePage: React.FC = () => {
 
     return (
         <div className="form-page-container">
-            <h1>Create a New Game</h1>
+            <h1>{t('title_create_game')}</h1>
 
             <div className="form-group">
-                <label>Max Players:</label>
+                <label>{t('label_max_players')}</label>
                 <input
                     type="number"
                     min="1"
@@ -119,7 +121,7 @@ const CreateGamePage: React.FC = () => {
                 />
             </div>
             <div className="form-group">
-                <label>Game Mode:</label>
+                <label>{t('label_game_mode')}</label>
                 <select
                     className="form-select"
                     value={gameMode}
@@ -272,7 +274,7 @@ const CreateGamePage: React.FC = () => {
             )}
 
             <button onClick={handleCreateGame} disabled={loading} className="form-submit-btn">
-                {loading ? 'Creating Game...' : 'Start Game'}
+                {loading ? t('btn_creating') : t('btn_create')}
             </button>
 
             {/* Display local form errors or context errors */}

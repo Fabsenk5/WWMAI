@@ -17,5 +17,19 @@
     "host_controls": "Host-Steuerung",
     "kick": "Kicken",
     "end_game": "Spiel beenden",
-    "pause_game": "Spiel pausieren"
+    "pause_game": "Spiel pausieren",
+    "welcome_message": "Willkommen bei Wer wird Millionär!",
+    "choose_option": "Wähle eine Option:",
+    "create_game": "Neues Spiel erstellen",
+    "join_game": "Spiel beitreten",
+    "title_create_game": "Neues Spiel erstellen",
+    "title_join_game": "Spiel beitreten",
+    "label_room_code": "Raumcode:",
+    "label_your_name": "Dein Name:",
+    "label_max_players": "Max. Spieler:",
+    "label_game_mode": "Spielmodus:",
+    "btn_join": "Beitreten",
+    "btn_create": "Spiel starten",
+    "btn_joining": "Verbinde...",
+    "btn_creating": "Erstelle Spiel..."
 }

@@ -17,5 +17,19 @@
     "host_controls": "Controles del anfitrión",
     "kick": "Expulsar",
     "end_game": "Terminar juego",
-    "pause_game": "Pausar juego"
+    "pause_game": "Pausar juego",
+    "welcome_message": "¡Bienvenido a ¿Quién quiere ser millonario?!",
+    "choose_option": "Elige una opción para comenzar:",
+    "create_game": "Crear nueva partida",
+    "join_game": "Unirse a partida",
+    "title_create_game": "Crear nueva partida",
+    "title_join_game": "Unirse a partida",
+    "label_room_code": "Código de sala:",
+    "label_your_name": "Tu nombre:",
+    "label_max_players": "Máx. jugadores:",
+    "label_game_mode": "Modo de juego:",
+    "btn_join": "Unirse",
+    "btn_create": "Comenzar",
+    "btn_joining": "Uniéndose...",
+    "btn_creating": "Creando..."
 }
