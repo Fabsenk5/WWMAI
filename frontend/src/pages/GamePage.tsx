@@ -124,13 +124,13 @@ const GamePage: React.FC = () => {
         setQuestionError(undefined);
 
         // Audio: Background Loop
-        const level = (data as any).level || 1;
+        const level = data.level || 1;
         playTrack(getAudioForLevel(level, 'question'), true);
 
         if (setGameData) {
           setGameData(prev => {
             if (!prev) return null;
-            const newLevel = (data as any).level || prev.current_level;
+            const newLevel = data.level || prev.current_level;
             return {
               ...prev,
               current_level: newLevel,

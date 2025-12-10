@@ -13,6 +13,7 @@ interface Question {
     correctAnswer: string;
     incorrect_answers?: string[]; // Add optional incorrect_answers for mapping
     prize: number; // Added prize field
+    level?: number; // Added level field
 }
 
 interface User { // Rename Player to User for consistency
