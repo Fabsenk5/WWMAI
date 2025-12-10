@@ -1033,7 +1033,8 @@ export class GameController {
                 this.io.to(roomCode).emit('jokerUsed', { jokerType, userId: 'TEAM' });
             } else {
                 await this.db.query(`UPDATE players SET jokers_used = array_append(jokers_used, $1) WHERE userId = $2`, [jokerType, userId]);
-                // User specific response, no broadcast needed for personal joker consumption usually, but maybe for UI status
+                // Emit event so frontend plays audio and updates UI if needed
+                this.io.to(roomCode).emit('jokerUsed', { jokerType, userId });
             }
 
             res.status(200).json({ ...payload, jokerType });
