@@ -18,7 +18,10 @@ const AudioContext = createContext<AudioContextType | undefined>(undefined);
 
 export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
     const [isPlaying, setIsPlaying] = useState(false);
-    const [volume, setVolumeState] = useState(0.5);
+    const [volume, setVolumeState] = useState(() => {
+        const saved = localStorage.getItem('wwmai_bgm_volume');
+        return saved ? parseFloat(saved) : 0.1; // Default 10%
+    });
     const [isMuted, setIsMuted] = useState(false); // Add mute state
     const audioRef = useRef<HTMLAudioElement | null>(null);
     const [currentTrack] = useState('/assets/audio/background_loop.mp3');
@@ -34,14 +37,6 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         return () => {
             stopAll();
         };
-    }, []);
-
-    // Load persisted volume only once on mount
-    useEffect(() => {
-        const savedVolume = localStorage.getItem('wwmai_bgm_volume');
-        if (savedVolume) {
-            setVolumeState(parseFloat(savedVolume));
-        }
     }, []);
 
     // Sync volume to active track
