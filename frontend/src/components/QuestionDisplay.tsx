@@ -1,5 +1,6 @@
 import React from 'react';
 import '../styles/Game.css';
+import { useLanguage } from '../context/LanguageContext';
 
 interface Question {
     question: string;
@@ -16,7 +17,7 @@ interface QuestionDisplayProps {
     isHost?: boolean; // Add flag to indicate if the viewer is the host/operator
 }
 
-import { useLanguage } from '../context/LanguageContext';
+
 
 // ... (interfaces)
 

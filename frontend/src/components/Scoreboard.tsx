@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 
 interface PlayerScore {
     name: string;
@@ -11,7 +12,7 @@ interface ScoreboardProps {
     gameEnded: boolean;
 }
 
-import { useTranslation } from 'react-i18next';
+
 
 // ... interfaces
 
