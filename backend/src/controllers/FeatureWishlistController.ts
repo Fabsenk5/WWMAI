@@ -4,7 +4,7 @@ import pool from '../database/db';
 const ADMIN_EMAIL = 'fabiank5@hotmail.com';
 
 export const featureWishlistController = {
-    getAllWishes: async (req: Request, res: Response) => {
+    getAllWishes: async (req: Request, res: Response): Promise<void> => {
         try {
             const result = await pool.query('SELECT * FROM feature_wishes ORDER BY created_at DESC');
             res.json(result.rows);
@@ -14,24 +14,36 @@ export const featureWishlistController = {
         }
     },
 
-    createWish: async (req: Request, res: Response) => {
+    createWish: async (req: Request, res: Response): Promise<void> => {
         try {
             const user = (req as any).user;
-            // Admin Check as per guide/user request for creation? 
-            // Guide says: "Only admin can create wishes" in the controller snippet.
-            // I will follow that.
-            if (!user || user.email !== ADMIN_EMAIL) {
-                return res.status(403).json({ message: 'Only admin can create wishes' });
+            if (!user || !user.userId) {
+                res.status(401).json({ message: 'Unauthorized' });
+                return;
+            }
+
+            // Fetch user email from DB since it's not in the token
+            const userResult = await pool.query('SELECT email FROM users WHERE id = $1', [user.userId]);
+            if (userResult.rows.length === 0) {
+                res.status(401).json({ message: 'User not found' });
+                return;
+            }
+            const userEmail = userResult.rows[0].email;
+
+            if (userEmail !== ADMIN_EMAIL) {
+                res.status(403).json({ message: 'Only admin can create wishes' });
+                return;
             }
 
             const { title } = req.body;
             if (!title) {
-                return res.status(400).json({ message: 'Title is required' });
+                res.status(400).json({ message: 'Title is required' });
+                return;
             }
 
             const result = await pool.query(
                 'INSERT INTO feature_wishes (title, status, created_by_email) VALUES ($1, $2, $3) RETURNING *',
-                [title, 'pending', user.email]
+                [title, 'pending', userEmail]
             );
             res.status(201).json(result.rows[0]);
         } catch (error) {
@@ -40,18 +52,33 @@ export const featureWishlistController = {
         }
     },
 
-    updateWishStatus: async (req: Request, res: Response) => {
+    updateWishStatus: async (req: Request, res: Response): Promise<void> => {
         try {
             const user = (req as any).user;
-            if (!user || user.email !== ADMIN_EMAIL) {
-                return res.status(403).json({ message: 'Only admin can update wishes' });
+            if (!user || !user.userId) {
+                res.status(401).json({ message: 'Unauthorized' });
+                return;
+            }
+
+            // Fetch user email from DB
+            const userResult = await pool.query('SELECT email FROM users WHERE id = $1', [user.userId]);
+            if (userResult.rows.length === 0) {
+                res.status(401).json({ message: 'User not found' });
+                return;
+            }
+            const userEmail = userResult.rows[0].email;
+
+            if (userEmail !== ADMIN_EMAIL) {
+                res.status(403).json({ message: 'Only admin can update wishes' });
+                return;
             }
 
             const { id } = req.params;
             const { status } = req.body;
 
             if (!['pending', 'completed'].includes(status)) {
-                return res.status(400).json({ message: 'Invalid status' });
+                res.status(400).json({ message: 'Invalid status' });
+                return;
             }
 
             const result = await pool.query(
@@ -60,7 +87,8 @@ export const featureWishlistController = {
             );
 
             if (result.rows.length === 0) {
-                return res.status(404).json({ message: 'Wish not found' });
+                res.status(404).json({ message: 'Wish not found' });
+                return;
             }
 
             res.json(result.rows[0]);
@@ -70,11 +98,25 @@ export const featureWishlistController = {
         }
     },
 
-    deleteWish: async (req: Request, res: Response) => {
+    deleteWish: async (req: Request, res: Response): Promise<void> => {
         try {
             const user = (req as any).user;
-            if (!user || user.email !== ADMIN_EMAIL) {
-                return res.status(403).json({ message: 'Only admin can delete wishes' });
+            if (!user || !user.userId) {
+                res.status(401).json({ message: 'Unauthorized' });
+                return;
+            }
+
+            // Fetch user email from DB
+            const userResult = await pool.query('SELECT email FROM users WHERE id = $1', [user.userId]);
+            if (userResult.rows.length === 0) {
+                res.status(401).json({ message: 'User not found' });
+                return;
+            }
+            const userEmail = userResult.rows[0].email;
+
+            if (userEmail !== ADMIN_EMAIL) {
+                res.status(403).json({ message: 'Only admin can delete wishes' });
+                return;
             }
 
             const { id } = req.params;
