@@ -516,72 +516,70 @@ const LobbyPage: React.FC = () => {
 
           <h2>{t('round_results')}</h2>
 
-          {(() => {
-            const myName = getSafeStorage('userName');
-            const myUserId = getSafeStorage('userId');
+          <div className="result-grid">
 
-            // Try to find my result by userId first (more reliable), then fallback to name
-            const myResult = revealedAnswers.playerAnswers.find(p =>
-              (myUserId && (p as any).userId === myUserId) || p.name === myName
-            );
+            {/* User Answer Card */}
+            <div className="result-card user">
+              <span className="result-label">
+                {gameData?.game_mode === 'survival' ? t('your_answer') : t('team_choice')}
+              </span>
 
-            return (
-              <div className="result-message">
-                {gameData?.game_mode === 'survival' ? (
-                  myResult ? (
-                    <div style={{ fontSize: '1.2em', margin: '10px 0' }}>
-                      {t('your_answer')}: <strong>
-                        {(() => {
-                          // Lookup translation
-                          const opt = currentQuestion?.options?.find((o: any) => (typeof o === 'string' ? o : o.text) === myResult.answer);
-                          if (opt && typeof opt !== 'string' && opt.translations && opt.translations[language]) {
-                            return opt.translations[language];
-                          }
-                          return myResult.answer;
-                        })()}
-                      </strong>
-                      <span style={{ marginLeft: '10px' }}>
-                        {myResult.is_correct ? '✅' : '❌'}
-                      </span>
-                    </div>
-                  ) : (
-                    <p>You did not answer.</p>
-                  )
-                ) : (
-                  <>
-                    {t('team_choice')}: <strong>
-                      {(() => {
-                        const ans = teamAnswerInfo.answer;
-                        const opt = currentQuestion?.options?.find((o: any) => (typeof o === 'string' ? o : o.text) === ans);
-                        if (opt && typeof opt !== 'string' && opt.translations && opt.translations[language]) {
-                          return opt.translations[language];
-                        }
-                        return ans;
-                      })()}
-                    </strong>
-                    {teamAnswerInfo.isCorrect
-                      ? <span className="text-success ml-2">✅</span>
-                      : <span className="text-danger ml-2">❌</span>}
-                  </>
-                )}
-              </div>
-            );
-          })()}
-
-          <div className="correct-answer-box">
-            {t('correct_answer')}: <strong>
               {(() => {
-                const ans = revealedAnswers.correctAnswer;
-                const opt = currentQuestion?.options?.find((o: any) => (typeof o === 'string' ? o : o.text) === ans);
-                if (opt && typeof opt !== 'string' && opt.translations && opt.translations[language]) {
-                  return opt.translations[language];
+                const myName = getSafeStorage('userName');
+                const myUserId = getSafeStorage('userId');
+
+                let answerText = '';
+                let isCorrect = false;
+
+                if (gameData?.game_mode === 'survival') {
+                  const myResult = revealedAnswers.playerAnswers.find(p =>
+                    (myUserId && (p as any).userId === myUserId) || p.name === myName
+                  );
+                  if (myResult) {
+                    answerText = myResult.answer;
+                    isCorrect = myResult.is_correct;
+                  } else {
+                    answerText = 'Did not answer';
+                    // Handle case where user didn't answer -> isCorrect remains false
+                  }
+                } else {
+                  // Co-op
+                  answerText = teamAnswerInfo.answer;
+                  isCorrect = teamAnswerInfo.isCorrect;
                 }
-                return ans;
+
+                // Translation lookups
+                const opt = currentQuestion?.options?.find((o: any) => (typeof o === 'string' ? o : o.text) === answerText);
+                let displayText = answerText;
+                if (opt && typeof opt !== 'string' && opt.translations && opt.translations[language]) {
+                  displayText = opt.translations[language];
+                }
+
+                return (
+                  <div className="result-value">
+                    {displayText} {isCorrect ? ' ✅' : ' ❌'}
+                  </div>
+                );
               })()}
-            </strong>
+            </div>
+
+            {/* Correct Answer Card */}
+            <div className="result-card correct">
+              <span className="result-label">{t('correct_answer')}</span>
+              <div className="result-value">
+                {(() => {
+                  const ans = revealedAnswers.correctAnswer;
+                  const opt = currentQuestion?.options?.find((o: any) => (typeof o === 'string' ? o : o.text) === ans);
+                  if (opt && typeof opt !== 'string' && opt.translations && opt.translations[language]) {
+                    return opt.translations[language];
+                  }
+                  return ans;
+                })()}
+              </div>
+            </div>
           </div>
 
-          <p>{t('next_question_in')} {countdown}s...</p>
+          <p className="timer-text">{t('next_question_in')} {countdown}s...</p>
 
           <h3>{t('votes')}:</h3>
           <ul className="list-none">
