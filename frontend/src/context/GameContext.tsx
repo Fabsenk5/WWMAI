@@ -19,6 +19,7 @@ interface Question {
 interface User { // Rename Player to User for consistency
     userId: string; // Added userId
     name: string;
+    avatar_url?: string; // Added avatar_url
     score: number;
     lives: number;
     jokers_used?: string[]; // Added jokers_used

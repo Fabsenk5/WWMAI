@@ -1249,8 +1249,15 @@ export class GameController {
                 return;
             }
 
-            // Sanitized: NO userId
-            const query = `SELECT name, score, lives, jokers_used FROM players WHERE room_code = $1 ORDER BY score DESC`;
+            // Return userId and avatar_url by joining with users table
+            // CAST users.id to TEXT to compare with players.userId (VARCHAR)
+            const query = `
+                SELECT p.name, p.score, p.lives, p.jokers_used, p.userId, u.avatar_url 
+                FROM players p
+                LEFT JOIN users u ON p.userId = CAST(u.id AS VARCHAR)
+                WHERE p.room_code = $1 
+                ORDER BY p.score DESC
+            `;
             const result = await this.db.query(query, [roomCode]);
             res.status(200).json(result.rows);
         } catch (error) {

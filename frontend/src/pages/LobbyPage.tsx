@@ -633,8 +633,39 @@ const LobbyPage: React.FC = () => {
             <div
               key={i}
               className={`teammate-card ${gameData?.game_mode === 'survival' && p.lives === 0 ? 'dead' : ''}`}
-              style={{ position: 'relative' }}
+              style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center' }}
             >
+              {/* Avatar Display */}
+              <div style={{
+                width: '50px',
+                height: '50px',
+                borderRadius: '50%',
+                overflow: 'hidden',
+                marginBottom: '8px',
+                border: '2px solid rgba(255,255,255,0.2)',
+                backgroundColor: '#333'
+              }}>
+                {p.avatar_url ? (
+                  <img
+                    src={p.avatar_url}
+                    alt={p.name}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                ) : (
+                  <div style={{
+                    width: '100%',
+                    height: '100%',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    backgroundColor: '#555',
+                    fontSize: '1.2em'
+                  }}>
+                    {p.name.charAt(0).toUpperCase()}
+                  </div>
+                )}
+              </div>
+
               <div className="font-bold">{p.name}</div>
               <div>{t('price_money')}: {p.score?.toLocaleString('de-DE')}€</div>
               {gameData?.game_mode === 'survival' && <div>Lives: {p.lives} ❤️</div>}
