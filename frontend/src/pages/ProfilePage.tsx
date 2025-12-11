@@ -100,6 +100,18 @@ const ProfilePage: React.FC = () => {
                             <div style={{ fontSize: '0.8em', color: '#aaa' }}>Best Streak</div>
                             <div style={{ fontSize: '1.2em', fontWeight: 'bold' }}>{user.longest_win_streak || 0} 🏆</div>
                         </div>
+                        <div>
+                            <div style={{ fontSize: '0.8em', color: '#aaa' }}>Best Category</div>
+                            <div style={{ fontSize: '1.0em', fontWeight: 'bold', color: '#ffd700' }}>
+                                {user.best_category ? `${user.best_category.category} (${user.best_category.count})` : '-'}
+                            </div>
+                        </div>
+                        <div>
+                            <div style={{ fontSize: '0.8em', color: '#aaa' }}>Worst Category</div>
+                            <div style={{ fontSize: '1.0em', fontWeight: 'bold', color: '#ff6b6b' }}>
+                                {user.worst_category ? `${user.worst_category.category} (${user.worst_category.count})` : '-'}
+                            </div>
+                        </div>
                     </div>
                 </div>
 

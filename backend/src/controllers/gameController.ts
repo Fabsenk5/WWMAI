@@ -29,12 +29,18 @@ export class GameController {
 
     // Helper to update stats
     private async finalizeGameStats(roomCode: string, gameMode: string, result: 'win' | 'loss', finalLevel: number): Promise<void> {
+        console.log(`[finalizeGameStats] invoked for room ${roomCode}, mode: ${gameMode}, result: ${result}`);
         try {
             const playersRes = await this.db.query('SELECT userId, score, lives FROM players WHERE room_code = $1', [roomCode]);
+            console.log(`[finalizeGameStats] Players found:`, playersRes.rows);
             const prize = getPrizeForLevel(finalLevel); // For Co-op global prize
 
             for (const p of playersRes.rows) {
-                if (!/^\d+$/.test(p.userid)) continue; // Skip guests
+                console.log(`[finalizeGameStats] Processing player:`, p);
+                if (!/^\d+$/.test(p.userid)) {
+                    console.log(`[finalizeGameStats] Skipping guest/invalid user: ${p.userid}`);
+                    continue; // Skip guests
+                }
 
                 const uid = p.userid;
                 let isWinner = false;
@@ -48,6 +54,8 @@ export class GameController {
                     isWinner = result === 'win';
                     earnings = isWinner ? 1000000 : (p.score || prize); // Use Level prize for Co-op
                 }
+
+                console.log(`[finalizeGameStats] Updating user ${uid}. Winner: ${isWinner}, Earnings: ${earnings}`);
 
                 if (isWinner) {
                     await this.db.query(`

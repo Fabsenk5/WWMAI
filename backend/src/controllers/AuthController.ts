@@ -128,8 +128,44 @@ export class AuthController {
             // Removed global premium check to preserve subscription integrity.
             // Frontend will verify global status.
 
-            res.status(200).json({ user });
+            // Fetch Category Stats
+            const catQuery = `
+                SELECT q.category, 
+                       COUNT(*) FILTER (WHERE pa.is_correct) as correct_count,
+                       COUNT(*) FILTER (WHERE NOT pa.is_correct) as incorrect_count
+                FROM player_answers pa
+                JOIN questions q ON pa.question_id = q.question_id
+                WHERE pa.user_id = $1
+                GROUP BY q.category
+            `;
+            const catResult = await this.db.query(catQuery, [userId]);
 
+            let bestCat = null;
+            let worstCat = null;
+
+            if (catResult.rows.length > 0) {
+                // Best: Most correct answers
+                const sortedByCorrect = [...catResult.rows].sort((a, b) => parseInt(b.correct_count) - parseInt(a.correct_count));
+                if (parseInt(sortedByCorrect[0].correct_count) > 0) {
+                    bestCat = { category: sortedByCorrect[0].category, count: parseInt(sortedByCorrect[0].correct_count) };
+                }
+
+                // Worst: Most incorrect answers (or should it be least correct?)
+                // User asked for "worst category", usually implying where they struggle most.
+                // Converting to "Most Incorrect" seems appropriate.
+                const sortedByIncorrect = [...catResult.rows].sort((a, b) => parseInt(b.incorrect_count) - parseInt(a.incorrect_count));
+                if (parseInt(sortedByIncorrect[0].incorrect_count) > 0) {
+                    worstCat = { category: sortedByIncorrect[0].category, count: parseInt(sortedByIncorrect[0].incorrect_count) };
+                }
+            }
+
+            res.status(200).json({
+                user: {
+                    ...user,
+                    best_category: bestCat,
+                    worst_category: worstCat
+                }
+            });
         } catch (error) {
             console.error('Error in getMe:', error);
             res.status(500).json({ error: 'Internal server error' });
