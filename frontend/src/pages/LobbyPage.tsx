@@ -57,6 +57,7 @@ const LobbyPage: React.FC = () => {
   const [revealedAnswers, setRevealedAnswers] = useState<RevealAnswersPayload | null>(null);
   const [countdown, setCountdown] = useState<number | null>(null);
   const [isValidRoom, setIsValidRoom] = useState<boolean | null>(null);
+  const [gameResult, setGameResult] = useState<'victory' | 'defeat' | null>(null); // New state
 
   const [waitingForCount, setWaitingForCount] = useState<{ count: number, total: number } | null>(null);
   const [teamAnswerInfo, setTeamAnswerInfo] = useState<{ answer: string, isCorrect: boolean } | null>(null);
@@ -195,7 +196,7 @@ const LobbyPage: React.FC = () => {
       setGameDataFromContext(prev => prev ? { ...prev, status: 'started' } : null);
     };
 
-    const handleRevealAnswers = (data: RevealAnswersPayload & { teamAnswer: string, isTeamCorrect: boolean, livesRemaining: number }) => {
+    const handleRevealAnswers = (data: RevealAnswersPayload & { teamAnswer: string, isTeamCorrect: boolean, livesRemaining: number, gameEnded?: boolean, gameMode?: string }) => {
       setRevealedAnswers(data);
       setTeamAnswerInfo({ answer: data.teamAnswer, isCorrect: data.isTeamCorrect });
       setCountdown(data.timeToNextQuestion);
@@ -210,6 +211,48 @@ const LobbyPage: React.FC = () => {
       }
       setWaitingForCount(null);
       setGameDataFromContext(prev => prev ? { ...prev, lives: data.livesRemaining } : null);
+
+      // Handle Game End inline
+      if (data.gameEnded) {
+        // Determine Result
+        // Survival: If lives > 0 and level >= 15 -> Victory, else Defeat
+        // Co-op: isTeamCorrect on last level -> Victory, else Defeat
+        let result: 'victory' | 'defeat' = 'defeat';
+
+        if (data.gameMode === 'survival') {
+          // In survival, if we receive gameEnded, check if it was a win or loss
+          // Usually backend outcome tells us. 
+          // We can infer from level: if level >= 15 (max) and we just answered...
+          // Actually, simply: if livesRemaining > 0 it's likely a win? 
+          // But in survival, "gameEnded" usually means someone won or everyone died.
+          // Let's assume defeat unless proven otherwise?
+          // Wait, if *I* am dead (lives=0), it's defeat for ME. 
+          // But the payload is global.
+          // Let's rely on the message in handleGameEnded? No, we want it NOW.
+          // Let's check livesRemaining. If > 0, we survived? 
+          // Actually, simpler: if isTeamCorrect (meaning correctness) was true on the final question?
+          // Backend logic: "if (current_level >= 15) ... 'Game Over! Victory!'"
+          // So if level >= 15 and correct -> Victory.
+          // If lives === 0 -> Defeat.
+          if (data.livesRemaining > 0 && data.currentLevel >= 15) {
+            result = 'victory';
+          }
+        } else {
+          // Co-op
+          if (data.isTeamCorrect && data.currentLevel >= 15) {
+            result = 'victory';
+          }
+        }
+        // Override: if lives == 0, it's definitely defeat in both modes (team lives vs player lives)
+        if (data.livesRemaining === 0) {
+          result = 'defeat';
+        }
+        // Special case: Survival Win is handled by backend emitting gameEnded.
+        // If level >= 15 and we are here, it's a win.
+        if (data.currentLevel >= 15 && data.livesRemaining > 0) result = 'victory';
+
+        setGameResult(result);
+      }
 
       const countdownInterval = setInterval(() => {
         setCountdown(prevTime => {
@@ -231,9 +274,15 @@ const LobbyPage: React.FC = () => {
     };
 
     const handleGameEnded = (data: { message: string }) => {
+      // Backend still emits this after 30s. We can use it to force redirect.
       stopAll();
-      playTrack('63 Closing Theme.mp3', false); // Play closing theme
-      showAlert(data.message, 'Game Over');
+      playTrack('63 Closing Theme.mp3', false);
+      // Do NOT show blocking alert if we already showed the inline result.
+      // But maybe we want to redirect now?
+      // navigate('/'); 
+      // User said "delay redirection". 
+      // The backend emits this event 30s later specifically for this.
+      // So yes, we should redirect now.
       navigate('/');
     };
 
@@ -419,6 +468,52 @@ const LobbyPage: React.FC = () => {
 
       {revealedAnswers && teamAnswerInfo && (
         <div className="answers-reveal">
+
+          {/* Game Over / Victory Banner */}
+          {gameResult && (
+            <>
+              <div className={`game-over-banner ${gameResult}`}>
+                <div className="game-over-title">
+                  {gameResult === 'victory' ? '🏆 VICTORY! 🏆' : '💀 GAME OVER 💀'}
+                </div>
+                <div className="game-over-text">
+                  {gameResult === 'victory'
+                    ? 'Congratulations! You are a Millionaire!'
+                    : 'Better luck next time!'}
+                </div>
+                <button className="leave-btn" onClick={() => navigate('/')}>
+                  Main Menu
+                </button>
+              </div>
+
+              {/* Effects */}
+              {gameResult === 'victory' && (
+                <div className="fireworks-container">
+                  <div className="firework"></div>
+                  <div className="firework"></div>
+                  <div className="firework"></div>
+                </div>
+              )}
+              {gameResult === 'defeat' && (
+                <div className="skulls-container">
+                  {Array.from({ length: 15 }).map((_, i) => (
+                    <div
+                      key={i}
+                      className="falling-skull"
+                      style={{
+                        left: `${Math.random() * 100}vw`,
+                        animationDuration: `${2 + Math.random() * 3}s`,
+                        animationDelay: `${Math.random() * 2}s`
+                      }}
+                    >
+                      💀
+                    </div>
+                  ))}
+                </div>
+              )}
+            </>
+          )}
+
           <h2>{t('round_results')}</h2>
 
           {(() => {
