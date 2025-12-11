@@ -134,7 +134,7 @@ export class AuthController {
                        COUNT(*) FILTER (WHERE pa.is_correct) as correct_count,
                        COUNT(*) FILTER (WHERE NOT pa.is_correct) as incorrect_count
                 FROM player_answers pa
-                JOIN questions q ON pa.question_id = q.question_id
+                JOIN questions q ON pa.question_id = q.id
                 WHERE pa.user_id = $1
                 GROUP BY q.category
             `;
