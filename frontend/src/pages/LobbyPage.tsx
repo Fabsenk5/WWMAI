@@ -220,37 +220,29 @@ const LobbyPage: React.FC = () => {
         let result: 'victory' | 'defeat' = 'defeat';
 
         if (data.gameMode === 'survival') {
-          // In survival, if we receive gameEnded, check if it was a win or loss
-          // Usually backend outcome tells us. 
-          // We can infer from level: if level >= 15 (max) and we just answered...
-          // Actually, simply: if livesRemaining > 0 it's likely a win? 
-          // But in survival, "gameEnded" usually means someone won or everyone died.
-          // Let's assume defeat unless proven otherwise?
-          // Wait, if *I* am dead (lives=0), it's defeat for ME. 
-          // But the payload is global.
-          // Let's rely on the message in handleGameEnded? No, we want it NOW.
-          // Let's check livesRemaining. If > 0, we survived? 
-          // Actually, simpler: if isTeamCorrect (meaning correctness) was true on the final question?
-          // Backend logic: "if (current_level >= 15) ... 'Game Over! Victory!'"
-          // So if level >= 15 and correct -> Victory.
-          // If lives === 0 -> Defeat.
-          if (data.livesRemaining > 0 && data.currentLevel >= 15) {
+          // Survival: Victory if Level 15 reached AND (I am alive OR I just answered correctly)
+          // Actually, if gameEnded=true at level 15, it implies the game was beaten.
+          // Let's trust the level.
+          if (data.currentLevel >= 15) {
             result = 'victory';
           }
         } else {
-          // Co-op
+          // Co-op: Victory if Team Correct at Level 15
           if (data.isTeamCorrect && data.currentLevel >= 15) {
             result = 'victory';
           }
         }
-        // Override: if lives == 0, it's definitely defeat in both modes (team lives vs player lives)
+
+        // Override: if lives == 0, it is defeat for ME in survival (even if others win?)
+        // The user wants "Game Over" if THEY lost.
+        // Wait, if I am dead but the game ends at 15... 
+        // If I am dead earlier, I see spectator mode.
+        // If I survive to 15, result is victory.
         if (data.livesRemaining === 0) {
           result = 'defeat';
         }
-        // Special case: Survival Win is handled by backend emitting gameEnded.
-        // If level >= 15 and we are here, it's a win.
-        if (data.currentLevel >= 15 && data.livesRemaining > 0) result = 'victory';
 
+        console.log(`[GameResult] Level: ${data.currentLevel}, Lives: ${data.livesRemaining}, Mode: ${data.gameMode} -> Result: ${result}`);
         setGameResult(result);
       }
 
