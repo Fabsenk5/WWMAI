@@ -108,7 +108,13 @@ export class QuestionModel {
                 } else if (difficulty === 'hard') {
                     fallbackOrder = ['medium', 'very_hard', 'easy'];
                 } else if (difficulty === 'medium') {
-                    fallbackOrder = ['hard', 'easy', 'very_hard'];
+                    if (level < 8) {
+                        // Early game medium: Prefer easier fallback
+                        fallbackOrder = ['easy', 'hard', 'very_hard'];
+                    } else {
+                        // Late game medium: Prefer harder fallback
+                        fallbackOrder = ['hard', 'easy', 'very_hard'];
+                    }
                 } else {
                     // easy
                     fallbackOrder = ['medium', 'hard', 'very_hard'];

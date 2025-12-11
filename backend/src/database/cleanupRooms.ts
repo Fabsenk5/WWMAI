@@ -21,7 +21,7 @@ export const cleanupInactiveRooms = async () => {
         const deleteQuery = `
             DELETE FROM games
             WHERE last_active < NOW() - INTERVAL '${INACTIVITY_THRESHOLD_MINUTES} minutes' 
-            AND (status = 'pending' OR status = 'started')
+            AND (status = 'pending' OR status = 'started' OR status = 'ended')
             RETURNING room_code;
         `;
         const deletedRoomsResult = await client.query(deleteQuery);
