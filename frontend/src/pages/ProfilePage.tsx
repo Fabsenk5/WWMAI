@@ -3,6 +3,7 @@ import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom'; // Import Link
 import '../styles/Forms.css';
 import { API_BASE_URL } from '../config/api';
+import FeatureWishlistButton from '../components/FeatureWishlistButton';
 
 const ProfilePage: React.FC = () => {
     const { user, logout, token, login } = useAuth(); // Need token and login to update local state
@@ -52,7 +53,10 @@ const ProfilePage: React.FC = () => {
 
     return (
         <div className="form-page-container">
-            <h1>My Profile</h1>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h1 style={{ margin: 0 }}>My Profile</h1>
+                <FeatureWishlistButton />
+            </div>
             <div style={{ textAlign: 'left', marginBottom: '20px' }}>
                 <p><strong>Username:</strong> {user.username}</p>
                 <p><strong>Email:</strong> {user.email}</p>

@@ -4,6 +4,7 @@ import { json } from 'express'; // Standard express json parser
 import requestIp from 'request-ip';
 import authRoutes from './routes/authRoutes';
 import billingRoutes from './routes/billingRoutes'; // Import billingRoutes
+import featureWishlistRoutes from './routes/featureWishlistRoutes'; // Import featureWishlistRoutes
 import { connectWithRetry, initializeDatabase } from './database/db';
 import pool from './database/db';
 import { setRoutes } from './routes/gameRoutes';
@@ -77,6 +78,7 @@ setRoutes(app);
 
 app.use('/api/admin', createAdminRouter(pool));
 app.use('/api/auth', authRoutes);
+app.use('/api/feature-wishes', featureWishlistRoutes);
 
 setInterval(() => {
     cleanupInactiveRooms().catch(err => {

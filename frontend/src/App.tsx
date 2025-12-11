@@ -13,6 +13,7 @@ import LoginPage from './pages/LoginPage';
 import RegisterPage from './pages/RegisterPage';
 import ProfilePage from './pages/ProfilePage';
 import UpgradePage from './pages/UpgradePage'; // Import UpgradePage
+import FeatureWishlist from './pages/FeatureWishlist'; // Import FeatureWishlist
 import { ModalProvider } from './context/ModalContext';
 import { AudioProvider } from './context/AudioContext';
 import AudioPlayer from './components/AudioPlayer';
@@ -49,6 +50,7 @@ function App() {
                 <Route path="/register" element={<RegisterPage />} />
                 <Route path="/profile" element={<ProfilePage />} />
                 <Route path="/upgrade" element={<UpgradePage />} />
+                <Route path="/feature-wishlist" element={<FeatureWishlist />} />
 
                 {/* Admin Routes */}
                 <Route path="/admin" element={<AdminLogin />} />

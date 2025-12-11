@@ -6,6 +6,7 @@ import '../styles/Forms.css';
 import { API_BASE_URL } from '../config/api';
 import { getPublicGlobalPremiumStatus } from '../services/adminService';
 import { useTranslation } from 'react-i18next';
+import FeatureWishlistButton from '../components/FeatureWishlistButton';
 
 const CreateGamePage: React.FC = () => {
     const { t } = useTranslation();
@@ -106,7 +107,10 @@ const CreateGamePage: React.FC = () => {
 
     return (
         <div className="form-page-container">
-            <h1>{t('title_create_game')}</h1>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h1 style={{ margin: 0 }}>{t('title_create_game')}</h1>
+                <FeatureWishlistButton />
+            </div>
 
             <div className="form-group">
                 <label>{t('label_max_players')}</label>

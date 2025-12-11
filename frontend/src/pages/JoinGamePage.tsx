@@ -7,6 +7,7 @@ import '../styles/Forms.css'; // Import shared form styles
 
 import { API_BASE_URL } from '../config/api';
 import { useTranslation } from 'react-i18next';
+import FeatureWishlistButton from '../components/FeatureWishlistButton';
 
 const JoinGamePage: React.FC = () => {
     const { t } = useTranslation();
@@ -88,7 +89,10 @@ const JoinGamePage: React.FC = () => {
 
     return (
         <div className="form-page-container">
-            <h1>{t('title_join_game')}</h1>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <h1 style={{ margin: 0 }}>{t('title_join_game')}</h1>
+                <FeatureWishlistButton />
+            </div>
             <form onSubmit={handleJoinGame}>
                 <div className="form-group">
                     <label htmlFor="roomCode">{t('label_room_code')}</label>

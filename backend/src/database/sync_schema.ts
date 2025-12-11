@@ -115,6 +115,18 @@ export const syncDatabaseSchema = async () => {
         `);
         console.log('[Schema Sync] Verified system_settings table.');
 
+        // 7. Ensure 'feature_wishes' table exists
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS feature_wishes (
+                id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                title TEXT NOT NULL,
+                status VARCHAR(50) DEFAULT 'pending',
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                created_by_email VARCHAR(255)
+            );
+        `);
+        console.log('[Schema Sync] Verified feature_wishes table.');
+
         await client.query('COMMIT');
         console.log('[Schema Sync] Database synchronized successfully.');
 
