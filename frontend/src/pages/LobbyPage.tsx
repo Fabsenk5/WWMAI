@@ -540,7 +540,6 @@ const LobbyPage: React.FC = () => {
                     isCorrect = myResult.is_correct;
                   } else {
                     answerText = 'Did not answer';
-                    // Handle case where user didn't answer -> isCorrect remains false
                   }
                 } else {
                   // Co-op
@@ -548,7 +547,10 @@ const LobbyPage: React.FC = () => {
                   isCorrect = teamAnswerInfo.isCorrect;
                 }
 
-                // Translation lookups
+                // Translation & Prefix
+                const optIndex = currentQuestion?.options ? currentQuestion.options.findIndex((o: any) => (typeof o === 'string' ? o : o.text) === answerText) : -1;
+                const prefix = (optIndex !== undefined && optIndex !== -1) ? String.fromCharCode(65 + optIndex) + ': ' : '';
+
                 const opt = currentQuestion?.options?.find((o: any) => (typeof o === 'string' ? o : o.text) === answerText);
                 let displayText = answerText;
                 if (opt && typeof opt !== 'string' && opt.translations && opt.translations[language]) {
@@ -557,7 +559,7 @@ const LobbyPage: React.FC = () => {
 
                 return (
                   <div className="result-value">
-                    {displayText} {isCorrect ? ' ✅' : ' ❌'}
+                    {prefix}{displayText} {isCorrect ? ' ✅' : ' ❌'}
                   </div>
                 );
               })()}
@@ -569,11 +571,16 @@ const LobbyPage: React.FC = () => {
               <div className="result-value">
                 {(() => {
                   const ans = revealedAnswers.correctAnswer;
+                  const optIndex = currentQuestion?.options ? currentQuestion.options.findIndex((o: any) => (typeof o === 'string' ? o : o.text) === ans) : -1;
+                  const prefix = optIndex !== -1 ? String.fromCharCode(65 + optIndex) + ': ' : '';
+
                   const opt = currentQuestion?.options?.find((o: any) => (typeof o === 'string' ? o : o.text) === ans);
+                  let displayText = ans;
                   if (opt && typeof opt !== 'string' && opt.translations && opt.translations[language]) {
-                    return opt.translations[language];
+                    displayText = opt.translations[language];
                   }
-                  return ans;
+
+                  return <>{prefix}{displayText}</>;
                 })()}
               </div>
             </div>
@@ -679,18 +686,16 @@ const LobbyPage: React.FC = () => {
                       );
                     }
 
+                    const prefix = String.fromCharCode(65 + index); // 65 is 'A'
+
                     return (
                       <button
                         key={index}
                         onClick={() => setSelectedAnswer(optionText)}
-                        disabled={answerSubmitted || !isAlive}
+                        disabled={!isAlive || answerSubmitted}
                         className={`option-button ${selectedAnswer === optionText ? 'selected' : ''}`}
-                        style={{
-                          opacity: !isAlive ? 0.6 : 1,
-                          cursor: !isAlive ? 'not-allowed' : 'pointer'
-                        }}
                       >
-                        {optionDisplay}
+                        <span className="option-prefix">{prefix}:</span> {optionDisplay}
                       </button>
                     );
                   })}

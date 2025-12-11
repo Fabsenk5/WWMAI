@@ -97,17 +97,40 @@ export class QuestionModel {
                 question = await this.getRandomQuestionByDifficulty(difficulty, excludeIds, categories);
             }
 
-            // 2. Fallback: Exact difficulty (Any Category)
+            // 2. Fallback: Adjacent Difficulties (Smart Fallback)
             if (!question) {
-                if (categories && categories.length > 0) {
-                    console.log(`[QuestionModel] No question found for level ${level} in selected categories. Falling back to ANY category.`);
+                console.log(`[QuestionModel] No question found for level ${level} (${difficulty}). Trying fallbacks.`);
+
+                let fallbackOrder: string[] = [];
+
+                if (difficulty === 'very_hard') {
+                    fallbackOrder = ['hard', 'medium', 'easy'];
+                } else if (difficulty === 'hard') {
+                    fallbackOrder = ['medium', 'very_hard', 'easy'];
+                } else if (difficulty === 'medium') {
+                    fallbackOrder = ['hard', 'easy', 'very_hard'];
+                } else {
+                    // easy
+                    fallbackOrder = ['medium', 'hard', 'very_hard'];
                 }
-                question = await this.getRandomQuestionByDifficulty(difficulty, excludeIds, null);
+
+                for (const fbDiff of fallbackOrder) {
+                    if (categories && categories.length > 0) {
+                        question = await this.getRandomQuestionByDifficulty(fbDiff, excludeIds, categories);
+                    }
+                    if (!question) {
+                        question = await this.getRandomQuestionByDifficulty(fbDiff, excludeIds, null);
+                    }
+                    if (question) {
+                        console.log(`[QuestionModel] Fallback successful: Found '${fbDiff}' question for level ${level} (Target: ${difficulty})`);
+                        break;
+                    }
+                }
             }
 
-            // 3. Last Resort: Any difficulty
+            // 3. Last Resort: Any random question (ignoring difficulty completely if above failed)
             if (!question) {
-                console.warn(`No questions found for difficulty: ${difficulty} (level ${level}). Falling back to any difficulty.`);
+                console.warn(`No questions found for difficulty hierarchy starting at: ${difficulty} (level ${level}). Falling back to purely random.`);
                 question = await this.getRandomQuestionByDifficulty(null, excludeIds, null);
             }
 
