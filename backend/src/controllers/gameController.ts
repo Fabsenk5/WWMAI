@@ -1095,10 +1095,19 @@ export class GameController {
             } else if (jokerType === 'audience') {
                 // Simulate Audience
                 const difficulty = question.difficulty;
-                let correctChance = 1.0; // Easy: 100%
-                if (difficulty === 'medium') correctChance = 0.9; // Medium: 90%
-                if (difficulty === 'hard') correctChance = 0.75; // Hard: 75%
-                if (difficulty === 'very_hard') correctChance = 0.6; // Very Hard: 60%
+                let reliability = 1.0; // x: Chance the audience is "right" (majority)
+                let minVote = 80;      // y: Min % for correct answer if reliable
+
+                if (difficulty === 'medium') {
+                    reliability = 0.9;
+                    minVote = 70;
+                } else if (difficulty === 'hard') {
+                    reliability = 0.75;
+                    minVote = 60;
+                } else if (difficulty === 'very_hard') {
+                    reliability = 0.6;
+                    minVote = 51;
+                }
 
                 const options = this.getConsistentOptions(
                     question.id,
@@ -1109,7 +1118,16 @@ export class GameController {
                 let remaining = 100;
 
                 // Probability roll
-                const correctVote = Math.random() < correctChance ? Math.floor(correctChance * 100) : Math.floor(Math.random() * 40);
+                const isReliable = Math.random() < reliability;
+                let correctVote = 0;
+
+                if (isReliable) {
+                    // Correct answer gets between y% (minVote) and 95%
+                    correctVote = Math.floor(Math.random() * (95 - minVote + 1)) + minVote;
+                } else {
+                    // Audience is wrong/confused: Correct answer gets 0-40%
+                    correctVote = Math.floor(Math.random() * 41);
+                }
 
                 // Assign votes
                 options.forEach((opt: any) => {
@@ -1121,13 +1139,25 @@ export class GameController {
                     }
                 });
 
-                // Distribute remaining
+                // Distribute remaining votes among incorrect options
                 const otherOptions = options.filter((o: any) => o.text !== question.correct_answer);
+
+                // Shuffle other options to distribute votes randomly, avoiding visible patterns
+                // (e.g., first incorrect option always getting the bulk of the remainder)
+                for (let i = otherOptions.length - 1; i > 0; i--) {
+                    const j = Math.floor(Math.random() * (i + 1));
+                    [otherOptions[i], otherOptions[j]] = [otherOptions[j], otherOptions[i]];
+                }
+
                 otherOptions.forEach((opt: any, idx: number) => {
                     if (idx === otherOptions.length - 1) {
+                        // Last option gets all remaining
                         stats[opt.text] = remaining;
                     } else {
-                        const val = Math.floor(Math.random() * remaining);
+                        // Give a random chunk of the remaining
+                        // Ensure we leave at least 0 for others? actually random * remaining is fine
+                        // But let's avoid giving 0 too often if possible, though random is fine.
+                        const val = Math.floor(Math.random() * (remaining + 1));
                         stats[opt.text] = val;
                         remaining -= val;
                     }
