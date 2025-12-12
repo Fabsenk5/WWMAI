@@ -4,6 +4,7 @@ import { API_BASE_URL } from '../config/api';
 import { useAuth } from '../context/AuthContext';
 import { ArrowLeft, Plus, CheckCircle, Circle, Trash2, Loader2 } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import '../styles/Forms.css'; // Use shared form styles
 import '../styles/FeatureWishlist.css';
 
 interface Wish {
@@ -95,97 +96,97 @@ const FeatureWishlist: React.FC = () => {
     );
 
     return (
-        <div className="wishlist-page">
-            {/* Header */}
-            <div className="wishlist-header">
-                <Link to="/" style={{ color: '#9ca3af', display: 'flex', alignItems: 'center' }}>
-                    <ArrowLeft size={24} />
+        <div className="form-page-container">
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+                <Link to="/" style={{ color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
+                    <ArrowLeft size={24} style={{ marginRight: '0.5rem' }} />
+                    Back
                 </Link>
-                <h1 className="wishlist-title">Feature Wishlist</h1>
+                <h1 style={{ margin: 0 }}>Feature Wishlist</h1>
             </div>
 
-            <div className="wishlist-content">
-                {/* Hero Card */}
-                <div className="wishlist-hero">
-                    <h2>Dream Big! 🚀</h2>
-                    <p>
-                        Here is a list of features we are planning or dreaming about.
-                        Stay tuned for upcoming updates!
-                    </p>
-                </div>
 
-                {/* Admin Input */}
-                {isAdmin && (
-                    <div className="wishlist-input-container">
-                        <input
-                            type="text"
-                            placeholder="Add a new feature idea..."
-                            value={newItem}
-                            onChange={(e) => setNewItem(e.target.value)}
-                            onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
-                            className="wishlist-input"
-                        />
+            {/* Hero Card */}
+            <div className="wishlist-hero">
+                <h2>Dream Big! 🚀</h2>
+                <p>
+                    Here is a list of features we are planning or dreaming about.
+                    Stay tuned for upcoming updates!
+                </p>
+            </div>
+
+            {/* Admin Input */}
+            {isAdmin && (
+                <div className="wishlist-input-container">
+                    <input
+                        type="text"
+                        placeholder="Add a new feature idea..."
+                        value={newItem}
+                        onChange={(e) => setNewItem(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleAdd()}
+                        className="wishlist-input"
+                    />
+                    <button
+                        onClick={handleAdd}
+                        disabled={isSubmitting || !newItem.trim()}
+                        className="wishlist-add-btn"
+                    >
+                        <Plus size={20} />
+                    </button>
+                </div>
+            )}
+
+            {/* List */}
+            <div className="wishlist-list">
+                {wishes.map((wish) => (
+                    <div
+                        key={wish.id}
+                        className={`wishlist-item ${wish.status === 'completed' ? 'completed' : ''}`}
+                    >
                         <button
-                            onClick={handleAdd}
-                            disabled={isSubmitting || !newItem.trim()}
-                            className="wishlist-add-btn"
+                            onClick={() => handleToggleStatus(wish)}
+                            disabled={!isAdmin}
+                            className="wishlist-toggle-btn"
                         >
-                            <Plus size={20} />
+                            {wish.status === 'completed' ? (
+                                <CheckCircle size={24} color="#22c55e" />
+                            ) : (
+                                <Circle size={24} />
+                            )}
                         </button>
+
+                        <div className="wishlist-item-content">
+                            <h3 className="wishlist-item-title">
+                                {wish.title}
+                            </h3>
+                            <p className="wishlist-item-date">
+                                {new Date(wish.created_at).toLocaleDateString(undefined, {
+                                    year: 'numeric',
+                                    month: 'short',
+                                    day: 'numeric'
+                                })}
+                            </p>
+                        </div>
+
+                        {isAdmin && (
+                            <button
+                                onClick={() => handleDelete(wish.id)}
+                                className="wishlist-delete-btn"
+                            >
+                                <Trash2 size={16} />
+                            </button>
+                        )}
+                    </div>
+                ))}
+
+                {wishes.length === 0 && !loading && (
+                    <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
+                        No wishes yet. Time to dream! ✨
                     </div>
                 )}
 
-                {/* List */}
-                <div className="wishlist-list">
-                    {wishes.map((wish) => (
-                        <div
-                            key={wish.id}
-                            className={`wishlist-item ${wish.status === 'completed' ? 'completed' : ''}`}
-                        >
-                            <button
-                                onClick={() => handleToggleStatus(wish)}
-                                disabled={!isAdmin}
-                                className="wishlist-toggle-btn"
-                            >
-                                {wish.status === 'completed' ? (
-                                    <CheckCircle size={24} color="#22c55e" />
-                                ) : (
-                                    <Circle size={24} />
-                                )}
-                            </button>
-
-                            <div className="wishlist-item-content">
-                                <h3 className="wishlist-item-title">
-                                    {wish.title}
-                                </h3>
-                                <p className="wishlist-item-date">
-                                    {new Date(wish.created_at).toLocaleDateString(undefined, {
-                                        year: 'numeric',
-                                        month: 'short',
-                                        day: 'numeric'
-                                    })}
-                                </p>
-                            </div>
-
-                            {isAdmin && (
-                                <button
-                                    onClick={() => handleDelete(wish.id)}
-                                    className="wishlist-delete-btn"
-                                >
-                                    <Trash2 size={16} />
-                                </button>
-                            )}
-                        </div>
-                    ))}
-
-                    {wishes.length === 0 && !loading && (
-                        <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
-                            No wishes yet. Time to dream! ✨
-                        </div>
-                    )}
-                </div>
             </div>
-        </div>
+        </div >
     );
 };
 
