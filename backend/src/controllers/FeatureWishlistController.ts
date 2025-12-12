@@ -30,10 +30,11 @@ export const featureWishlistController = {
             }
             const userEmail = userResult.rows[0].email;
 
-            if (userEmail !== ADMIN_EMAIL) {
-                res.status(403).json({ message: 'Only admin can create wishes' });
-                return;
-            }
+            // Removed admin check to allow all users to create wishes
+            // if (userEmail !== ADMIN_EMAIL) {
+            //     res.status(403).json({ message: 'Only admin can create wishes' });
+            //     return;
+            // }
 
             const { title } = req.body;
             if (!title) {

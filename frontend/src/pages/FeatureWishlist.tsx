@@ -115,8 +115,8 @@ const FeatureWishlist: React.FC = () => {
                 </p>
             </div>
 
-            {/* Admin Input */}
-            {isAdmin && (
+            {/* User Input */}
+            {user && (
                 <div className="wishlist-input-container">
                     <input
                         type="text"
