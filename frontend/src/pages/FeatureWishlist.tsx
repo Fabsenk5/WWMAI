@@ -76,7 +76,7 @@ const FeatureWishlist: React.FC = () => {
     };
 
     const handleDelete = async (id: string) => {
-        if (!isAdmin || !confirm('Delete this wish?')) return;
+        if (!isAdmin || !window.confirm('Delete this wish?')) return;
         try {
             await axios.delete(`${API_BASE_URL}/api/feature-wishes/${id}`, {
                 headers: { Authorization: `Bearer ${token}` }
