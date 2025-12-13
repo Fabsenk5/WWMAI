@@ -968,6 +968,7 @@ export class GameController {
                 if (current_level >= 15) {
                     gameEnded = true;
                     await this.db.query(`UPDATE games SET status = 'ended', last_active = CURRENT_TIMESTAMP WHERE game_id = $1`, [gameId]);
+                    await this.finalizeGameStats(roomCode, 'cooperative', 'win', current_level);
                 }
             } else {
                 // Team is WRONG
@@ -977,6 +978,7 @@ export class GameController {
                 if (newLives <= 0) {
                     gameEnded = true;
                     await this.db.query(`UPDATE games SET status = 'ended' WHERE game_id = $1`, [gameId]);
+                    await this.finalizeGameStats(roomCode, 'cooperative', 'loss', current_level);
                 }
             }
 
