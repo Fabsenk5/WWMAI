@@ -10,6 +10,10 @@ import {
     getAllUsers,
     updateUserStatus,
     deleteUser,
+    updateQuestionStatus,
+    updateCategoryStatus,
+    updateAllQuestionsStatus,
+    regenerateQuestions,
     Question,
     QuestionsResponse,
     User
@@ -34,6 +38,7 @@ const AdminDashboard: React.FC = () => {
     const [totalPages, setTotalPages] = useState(0);
     const [filterCategory, setFilterCategory] = useState('');
     const [filterDifficulty, setFilterDifficulty] = useState('');
+    const [filterStatus, setFilterStatus] = useState<string>('all');
     const [loadingQuestions, setLoadingQuestions] = useState(false);
 
     // Global Settings State
@@ -67,7 +72,7 @@ const AdminDashboard: React.FC = () => {
             fetchUsers();
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [activeTab, page, filterCategory, filterDifficulty]);
+    }, [activeTab, page, filterCategory, filterDifficulty, filterStatus]);
 
     const fetchUsers = async () => {
         setLoadingUsers(true);
@@ -144,7 +149,8 @@ const AdminDashboard: React.FC = () => {
     const fetchQuestions = async () => {
         setLoadingQuestions(true);
         try {
-            const data: QuestionsResponse = await listQuestions(adminPassword, page, 20, filterCategory, filterDifficulty);
+            const isActive = filterStatus === 'active' ? true : filterStatus === 'archived' ? false : undefined;
+            const data: QuestionsResponse = await listQuestions(adminPassword, page, 20, filterCategory, filterDifficulty, isActive);
             setQuestions(data.questions);
             setTotal(data.total);
             setTotalPages(data.totalPages);
@@ -222,6 +228,62 @@ const AdminDashboard: React.FC = () => {
         }
     };
 
+    const handleUpdateQuestionStatus = async (id: number, isActive: boolean) => {
+        try {
+            const result = await updateQuestionStatus(id, isActive, adminPassword);
+            if (result.success) {
+                // Update local state
+                setQuestions(prev => prev.map(q => q.id === id ? { ...q, is_active: isActive } : q));
+            } else {
+                alert('Failed to update status');
+            }
+        } catch (error) {
+            console.error('Error updating question status:', error);
+        }
+    };
+
+    const handleUpdateCategoryStatus = async (category: string, isActive: boolean) => {
+        if (!window.confirm(`Are you sure you want to ${isActive ? 'ACTIVATE' : 'ARCHIVE'} all questions in "${category}"?`)) return;
+
+        try {
+            const result = await updateCategoryStatus(category, isActive, adminPassword);
+            if (result.success) {
+                setDeleteMessage(result.message);
+                setTimeout(() => setDeleteMessage(''), 3000);
+            }
+        } catch (error) {
+            setDeleteMessage('Error updating category status');
+        }
+    };
+
+    const handleUpdateAllStatus = async (isActive: boolean) => {
+        if (!window.confirm(`Are you sure you want to ${isActive ? 'ACTIVATE' : 'ARCHIVE'} ALL QUESTIONS GLOBALLY? This is a major action.`)) return;
+
+        try {
+            const result = await updateAllQuestionsStatus(isActive, adminPassword);
+            if (result.success) {
+                setSettingsMessage(result.message);
+                setTimeout(() => setSettingsMessage(''), 3000);
+            }
+        } catch (error) {
+            setSettingsMessage('Error updating global status');
+        }
+    };
+
+    const handleRegenerate = async () => {
+        if (!window.confirm('This will ARCHIVE ALL existing questions and start regenerating new ones from the AI. Are you sure?')) return;
+
+        try {
+            const result = await regenerateQuestions(adminPassword);
+            if (result.success) {
+                setSettingsMessage(result.message);
+                setTimeout(() => setSettingsMessage(''), 5000);
+            }
+        } catch (error) {
+            setSettingsMessage('Error starting regeneration');
+        }
+    };
+
     return (
         <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px', color: 'var(--text-primary)' }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
@@ -266,6 +328,24 @@ const AdminDashboard: React.FC = () => {
                 </button>
             </div>
 
+            {/* Contextual Global Controls */}
+            <div style={{ marginBottom: '20px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+                <button
+                    className="btn btn-primary"
+                    style={{ backgroundColor: 'var(--primary-color)' }}
+                    onClick={handleRegenerate}
+                >
+                    🔄 Archive & Regenerate All
+                </button>
+                <button
+                    className="btn"
+                    style={{ backgroundColor: 'var(--danger-color)' }}
+                    onClick={() => handleUpdateAllStatus(false)}
+                >
+                    ⚠️ Archive ALL
+                </button>
+            </div>
+
             <div className="form-page-container" style={{ maxWidth: '100%' }}>
                 {activeTab === 'categories' && (
                     <div>
@@ -278,10 +358,31 @@ const AdminDashboard: React.FC = () => {
                             {categories.map(category => (
                                 <div
                                     key={category}
-                                    className={`category-chip ${selectedCategories.includes(category) ? 'selected' : ''}`}
-                                    onClick={() => handleCategoryToggle(category)}
+                                    style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '5px' }}
                                 >
-                                    {category}
+                                    <div
+                                        className={`category-chip ${selectedCategories.includes(category) ? 'selected' : ''}`}
+                                        onClick={() => handleCategoryToggle(category)}
+                                        style={{ flex: 1 }}
+                                    >
+                                        {category}
+                                    </div>
+                                    <button
+                                        className="btn small-btn"
+                                        title="Archive All in Category"
+                                        style={{ padding: '2px 5px', fontSize: '10px', backgroundColor: 'var(--text-secondary)' }}
+                                        onClick={() => handleUpdateCategoryStatus(category, false)}
+                                    >
+                                        📁
+                                    </button>
+                                    <button
+                                        className="btn small-btn"
+                                        title="Activate All in Category"
+                                        style={{ padding: '2px 5px', fontSize: '10px', backgroundColor: 'var(--success-color)' }}
+                                        onClick={() => handleUpdateCategoryStatus(category, true)}
+                                    >
+                                        ✅
+                                    </button>
                                 </div>
                             ))}
                         </div>
@@ -321,11 +422,19 @@ const AdminDashboard: React.FC = () => {
                                     value={filterDifficulty}
                                     onChange={(e) => { setFilterDifficulty(e.target.value); setPage(1); }}
                                 >
-                                    <option value="">All Difficulties</option>
-                                    <option value="easy">Easy</option>
-                                    <option value="medium">Medium</option>
-                                    <option value="hard">Hard</option>
                                     <option value="very_hard">Very Hard</option>
+                                </select>
+                            </div>
+                            <div style={{ flex: 1 }}>
+                                <label style={{ display: 'block', marginBottom: '5px' }}>Filter by Status</label>
+                                <select
+                                    className="form-select"
+                                    value={filterStatus}
+                                    onChange={(e) => { setFilterStatus(e.target.value); setPage(1); }}
+                                >
+                                    <option value="all">All Status</option>
+                                    <option value="active">Active Only</option>
+                                    <option value="archived">Archived Only</option>
                                 </select>
                             </div>
                         </div>
@@ -339,6 +448,7 @@ const AdminDashboard: React.FC = () => {
                                         <th style={{ padding: '10px' }}>Diff</th>
                                         <th style={{ padding: '10px' }}>Question</th>
                                         <th style={{ padding: '10px' }}>Correct Answer</th>
+                                        <th style={{ padding: '10px' }}>Status</th>
                                         <th style={{ padding: '10px' }}>Action</th>
                                     </tr>
                                 </thead>
@@ -360,6 +470,30 @@ const AdminDashboard: React.FC = () => {
                                                 <td style={{ padding: '10px' }}>{q.text}</td>
                                                 <td style={{ padding: '10px' }}>{q.correctAnswer}</td>
                                                 <td style={{ padding: '10px' }}>
+                                                    <span style={{
+                                                        color: q.is_active ? 'var(--success-color)' : 'var(--text-secondary)',
+                                                        fontWeight: 'bold'
+                                                    }}>
+                                                        {q.is_active ? 'ACTIVE' : 'ARCHIVED'}
+                                                    </span>
+                                                </td>
+                                                <td style={{ padding: '10px' }}>
+                                                    <button
+                                                        className="btn"
+                                                        style={{
+                                                            padding: '4px 8px',
+                                                            fontSize: '0.8rem',
+                                                            backgroundColor: q.is_active ? 'gray' : 'var(--success-color)',
+                                                            color: 'white',
+                                                            border: 'none',
+                                                            borderRadius: '4px',
+                                                            cursor: 'pointer',
+                                                            marginRight: '5px'
+                                                        }}
+                                                        onClick={() => handleUpdateQuestionStatus(q.id, !q.is_active)}
+                                                    >
+                                                        {q.is_active ? 'Archive' : 'Activate'}
+                                                    </button>
                                                     <button
                                                         className="btn"
                                                         style={{

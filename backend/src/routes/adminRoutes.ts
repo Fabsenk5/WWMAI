@@ -16,6 +16,12 @@ export function createAdminRouter(pool: Pool): Router {
     router.get('/global-premium', adminController.getGlobalPremiumStatus);
     router.post('/global-premium', adminController.toggleGlobalPremiumStatus);
 
+    // Question Archival & Regeneration
+    router.post('/questions/status', adminController.updateQuestionStatus);
+    router.post('/categories/status', adminController.updateCategoryStatus);
+    router.post('/questions/all-status', adminController.updateAllQuestionsStatus);
+    router.post('/questions/regenerate', adminController.regenerateQuestions);
+
     // User Management
     router.get('/users', adminController.getAllUsers);
     router.post('/users/status', adminController.updateUserStatus);

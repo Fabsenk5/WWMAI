@@ -12,6 +12,7 @@ export interface Question {
     options: string[];
     level: number;
     prize: number;
+    is_active?: boolean;
 }
 
 export interface QuestionsResponse {
@@ -47,10 +48,11 @@ export const deleteQuestionsByCategories = async (categories: string[], password
     return response.json();
 };
 
-export const listQuestions = async (password: string, page: number = 1, limit: number = 20, category?: string, difficulty?: string): Promise<QuestionsResponse> => {
+export const listQuestions = async (password: string, page: number = 1, limit: number = 20, category?: string, difficulty?: string, isActive?: boolean): Promise<QuestionsResponse> => {
     let url = `${API_URL}/questions?password=${encodeURIComponent(password)}&page=${page}&limit=${limit}`;
     if (category) url += `&category=${encodeURIComponent(category)}`;
     if (difficulty) url += `&difficulty=${encodeURIComponent(difficulty)}`;
+    if (isActive !== undefined) url += `&isActive=${isActive}`;
 
     const response = await fetch(url);
     if (!response.ok) throw new Error('Failed to fetch questions');
@@ -150,4 +152,41 @@ export const deleteUser = async (userId: number, password: string): Promise<{ su
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || 'Failed to delete user');
     return data;
+};
+
+// Archival & Regeneration
+export const updateQuestionStatus = async (id: number, isActive: boolean, password: string): Promise<{ success: boolean; message: string }> => {
+    const response = await fetch(`${API_URL}/questions/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, isActive, password }),
+    });
+    return response.json();
+};
+
+export const updateCategoryStatus = async (category: string, isActive: boolean, password: string): Promise<{ success: boolean; count: number; message: string }> => {
+    const response = await fetch(`${API_URL}/categories/status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ category, isActive, password }),
+    });
+    return response.json();
+};
+
+export const updateAllQuestionsStatus = async (isActive: boolean, password: string): Promise<{ success: boolean; count: number; message: string }> => {
+    const response = await fetch(`${API_URL}/questions/all-status`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isActive, password }),
+    });
+    return response.json();
+};
+
+export const regenerateQuestions = async (password: string): Promise<{ success: boolean; message: string }> => {
+    const response = await fetch(`${API_URL}/questions/regenerate`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+    });
+    return response.json();
 };

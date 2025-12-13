@@ -170,6 +170,10 @@ export class QuestionModel {
             // Build the WHERE clause conditionally
             const conditions: string[] = [];
 
+            // Conditions
+            // Enforce active status for gameplay queries
+            conditions.push('is_active = true');
+
             if (difficulty) {
                 conditions.push(`difficulty = $${paramIndex++}`);
                 params.push(difficulty);
@@ -394,7 +398,7 @@ export class QuestionModel {
      * @param filters Optional filters object
      * @returns Object containing questions array and total count
      */
-    async getAllQuestions(limit: number = 50, offset: number = 0, filters: { category?: string, difficulty?: string } = {}) {
+    async getAllQuestions(limit: number = 50, offset: number = 0, filters: { category?: string, difficulty?: string, is_active?: boolean } = {}) {
         try {
             let query = 'SELECT * FROM questions';
             let countQuery = 'SELECT COUNT(*) FROM questions';
@@ -410,6 +414,11 @@ export class QuestionModel {
             if (filters.difficulty) {
                 conditions.push(`difficulty = $${paramIndex++}`);
                 params.push(filters.difficulty);
+            }
+
+            if (filters.is_active !== undefined) {
+                conditions.push(`is_active = $${paramIndex++}`);
+                params.push(filters.is_active);
             }
 
             if (conditions.length > 0) {
@@ -465,6 +474,48 @@ export class QuestionModel {
             throw new Error('Failed to delete question');
         } finally {
             client.release();
+        }
+    }
+
+    /**
+     * Update status for a specific question
+     */
+    async updateQuestionStatus(id: number, isActive: boolean): Promise<boolean> {
+        try {
+            const query = 'UPDATE questions SET is_active = $1 WHERE id = $2';
+            const result = await this.db.query(query, [isActive, id]);
+            return (result.rowCount || 0) > 0;
+        } catch (error) {
+            console.error(`Error updating status for question ${id}:`, error);
+            throw new Error('Failed to update question status');
+        }
+    }
+
+    /**
+     * Update status for all questions in a category
+     */
+    async updateCategoryStatus(category: string, isActive: boolean): Promise<number> {
+        try {
+            const query = 'UPDATE questions SET is_active = $1 WHERE category = $2';
+            const result = await this.db.query(query, [isActive, category]);
+            return result.rowCount || 0;
+        } catch (error) {
+            console.error(`Error updating status for category ${category}:`, error);
+            throw new Error('Failed to update category status');
+        }
+    }
+
+    /**
+     * Update status for ALL questions
+     */
+    async updateAllQuestionsStatus(isActive: boolean): Promise<number> {
+        try {
+            const query = 'UPDATE questions SET is_active = $1';
+            const result = await this.db.query(query, [isActive]);
+            return result.rowCount || 0;
+        } catch (error) {
+            console.error('Error updating all questions status:', error);
+            throw new Error('Failed to update global question status');
         }
     }
 }

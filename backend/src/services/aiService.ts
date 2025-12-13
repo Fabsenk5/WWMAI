@@ -43,7 +43,7 @@ export class AiService {
 
         try {
             // 1. Check current count
-            const countQuery = `SELECT COUNT(*) FROM questions WHERE category = $1`;
+            const countQuery = `SELECT COUNT(*) FROM questions WHERE category = $1 AND is_active = true`;
             const countRes = await this.db.query(countQuery, [category]);
             const currentCount = parseInt(countRes.rows[0].count, 10);
 

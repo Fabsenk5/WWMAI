@@ -3,14 +3,18 @@ import { Request, Response } from 'express';
 import { Pool } from 'pg';
 import { QuestionModel } from '../models/questionModel';
 
+import { AiService } from '../services/aiService';
+
 export class AdminController {
     private questionModel: QuestionModel;
     private db: Pool;
+    private aiService: AiService;
     private adminPassword = process.env.ADMIN_PASSWORD || 'admin';
 
     constructor(pool: Pool) {
         this.db = pool;
         this.questionModel = new QuestionModel(pool);
+        this.aiService = new AiService(pool);
     }
 
     /**
@@ -141,10 +145,11 @@ export class AdminController {
             const limit = parseInt(req.query.limit as string) || 20;
             const category = req.query.category as string;
             const difficulty = req.query.difficulty as string;
+            const isActive = req.query.isActive === 'true' ? true : req.query.isActive === 'false' ? false : undefined;
 
             const offset = (page - 1) * limit;
 
-            const result = await this.questionModel.getAllQuestions(limit, offset, { category, difficulty });
+            const result = await this.questionModel.getAllQuestions(limit, offset, { category, difficulty, is_active: isActive });
 
             res.json({
                 questions: result.questions,
@@ -331,6 +336,116 @@ export class AdminController {
         } catch (error) {
             console.error('Error deleting user:', error);
             res.status(500).json({ error: 'Failed to delete user' });
+        }
+    }
+
+    /**
+     * Update status for a specific question
+     */
+    updateQuestionStatus = async (req: Request, res: Response) => {
+        const { id, isActive, password } = req.body;
+
+        if (password !== this.adminPassword) {
+            res.status(401).json({ error: 'Unauthorized: Invalid password' });
+            return;
+        }
+
+        try {
+            const success = await this.questionModel.updateQuestionStatus(id, isActive);
+            if (success) {
+                res.json({ success: true, message: `Question ${isActive ? 'activated' : 'archived'}` });
+            } else {
+                res.status(404).json({ error: 'Question not found' });
+            }
+        } catch (error) {
+            res.status(500).json({ error: 'Failed to update question status' });
+        }
+    }
+
+    /**
+     * Update status for all questions in a category
+     */
+    updateCategoryStatus = async (req: Request, res: Response) => {
+        const { category, isActive, password } = req.body;
+
+        if (password !== this.adminPassword) {
+            res.status(401).json({ error: 'Unauthorized: Invalid password' });
+            return;
+        }
+
+        try {
+            const count = await this.questionModel.updateCategoryStatus(category, isActive);
+            res.json({ success: true, count, message: `${count} questions in "${category}" ${isActive ? 'activated' : 'archived'}` });
+        } catch (error) {
+            res.status(500).json({ error: 'Failed to update category status' });
+        }
+    }
+
+    /**
+     * Update status for ALL questions (Global Archive/Activate)
+     */
+    updateAllQuestionsStatus = async (req: Request, res: Response) => {
+        const { isActive, password } = req.body;
+
+        if (password !== this.adminPassword) {
+            res.status(401).json({ error: 'Unauthorized: Invalid password' });
+            return;
+        }
+
+        try {
+            const count = await this.questionModel.updateAllQuestionsStatus(isActive);
+            res.json({ success: true, count, message: `${count} questions globablly ${isActive ? 'activated' : 'archived'}` });
+        } catch (error) {
+            res.status(500).json({ error: 'Failed to update global question status' });
+        }
+    }
+
+    /**
+     * Archive All and Regenerate
+     */
+    regenerateQuestions = async (req: Request, res: Response) => {
+        const { password } = req.body;
+
+        if (password !== this.adminPassword) {
+            res.status(401).json({ error: 'Unauthorized: Invalid password' });
+            return;
+        }
+
+        try {
+            // 1. Archive All
+            console.log('[AdminController] Regenerate: Archiving all questions...');
+            await this.questionModel.updateAllQuestionsStatus(false);
+
+            // 2. Get All Categories (even inactive ones might still be in DB distinct query if distinct ignores filter? QuestionModel.getAllCategories currently queries all)
+            const categories = await this.questionModel.getAllCategories();
+            console.log(`[AdminController] Regenerate: Found ${categories.length} categories to regenerate.`);
+
+            // 3. Trigger AI for each category
+            // We'll respond to user immediately saying "Process Started"
+            categories.forEach(category => {
+                // Trigger background pool check. 
+                // Since all are archived, count will be 0 active? ensureCategoryPool checks count WHERE category=x.
+                // Wait, ensureCategoryPool checks TOTAL count in table, unrelated to is_active?
+                // We need to verify AiService.ensureCategoryPool query.
+                // It queries `SELECT COUNT(*) FROM questions WHERE category = $1` -> This counts inactive too!
+                // FIX NEEDED: AiService should check Active count?
+
+                // Actuallly, for regeneration, we usually want to build a FRESH set.
+                // If we archive them, they are 'gone' from gameplay.
+                // If getCount counts them, AiService thinks "we have enough".
+                // So AiService needs modification OR we delete them? 
+                // User said "archive", so we can't delete. 
+                // We need to tell AiService to only count ACTIVE questions.
+
+                // I will fix AiService in a separate tool call, but for now invoke it.
+                this.aiService.ensureCategoryPool(category, 50).catch(e => console.error(e));
+            });
+
+            res.json({ success: true, message: 'Archive complete. Regeneration started in background.' });
+
+        } catch (error) {
+            console.error('Error regenerating questions:', error);
+            res.status(500).json({ error: 'Failed to regenerate questions' });
         }
     }
 }
