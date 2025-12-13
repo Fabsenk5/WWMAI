@@ -125,23 +125,38 @@ const LobbyPage: React.FC = () => {
 
   useEffect(() => {
     if (!roomCode || !setGameDataFromContext) return;
+
+    // Determine effective user info
+    // If logged in (from AuthContext), use that. Otherwise fallback to storage or random guest.
+    const effectiveUserId = user ? String(user.id) : (getSafeStorage('userId') || `user-${Math.random().toString(36).substr(2, 9)}`);
+    const effectiveUserName = user ? user.username : (getSafeStorage('userName') || 'Guest');
+
     if (!socketRef.current) {
-      const storedUserId = getSafeStorage('userId');
       socketRef.current = io(API_BASE_URL, {
         query: {
           roomCode,
-          userId: storedUserId || `user-${Math.random().toString(36).substr(2, 9)}`
+          userId: effectiveUserId
         }
       });
     }
 
     const socket = socketRef.current;
+
+    // Ensure we are connected before emitting join, or wait for connect
+    if (socket.connected) {
+      socket.emit('joinRoom', {
+        roomCode,
+        userId: effectiveUserId,
+        playerName: effectiveUserName
+      });
+    }
+
     const onConnect = () => {
       if (roomCode) {
         socket.emit('joinRoom', {
           roomCode,
-          userId: getSafeStorage('userId'),
-          playerName: getSafeStorage('userName')
+          userId: effectiveUserId,
+          playerName: effectiveUserName
         });
       }
     };
