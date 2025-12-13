@@ -1,7 +1,6 @@
 import React, { useState, useContext, useEffect } from 'react'; // Import useContext and useEffect
 import { useNavigate } from 'react-router-dom';
 import { GameContext } from '../context/GameContext'; // Import GameContext
-import { useAuth } from '../context/AuthContext'; // Import useAuth
 import axios from 'axios'; // Import axios
 import '../styles/Forms.css'; // Import shared form styles
 
@@ -15,7 +14,7 @@ const JoinGamePage: React.FC = () => {
     const [userName, setUserName] = useState(''); // Rename playerName to userName
     // Use context for state management
     const { loading, error: contextError } = useContext(GameContext)!; // Keep GameContext for loading/error
-    const { user } = useAuth(); // Get user from AuthContext
+    // const { user } = useAuth(); // Unused
     const [localError, setLocalError] = useState<string | null>(null); // Local error for form validation
     const navigate = useNavigate();
     // But we want the NAME. 

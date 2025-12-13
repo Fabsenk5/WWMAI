@@ -80,6 +80,12 @@ const GamePage: React.FC = () => {
     fetchCurrentQuestion();
   }, [roomCode, gameData?.status, gameData?.current_level]);
 
+  // Use ref to access latest gameData inside socket callbacks without re-triggering effect
+  const gameDataRef = useRef(gameData);
+  useEffect(() => {
+    gameDataRef.current = gameData;
+  }, [gameData]);
+
   // --- Effect 3: WebSocket ---
   useEffect(() => {
     // Only connect if we have a roomCode and not already connected
@@ -99,11 +105,10 @@ const GamePage: React.FC = () => {
       socket.on('revealAnswers', (data) => {
         // Audio: Win/Lose
         stopAll();
-        // Assuming data has level info or we use current gameData level
-        const level = gameData?.current_level || 1; // Might be off by one if next level sent?
-        // Data usually contains result. We need to know if WE won or Team won.
-        // GamePage logic seems less complete on 'data' typing than LobbyPage.
-        // Assuming data structure match.
+        // Use ref for current data
+        const currentData = gameDataRef.current;
+        const level = currentData?.current_level || 1;
+
         if (data.isTeamCorrect) {
           playSFX(getAudioForLevel(level, 'win'));
         } else {
@@ -159,7 +164,7 @@ const GamePage: React.FC = () => {
         }
       };
     }
-  }, [roomCode, setGameData]);
+  }, [roomCode, setGameData, getAudioForLevel, playSFX, playTrack, stopAll]);
 
   // --- Effect 4: Poll for players ---
   useEffect(() => {

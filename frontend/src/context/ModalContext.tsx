@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useCallback } from 'react';
 import Modal from '../components/Modal';
 
 interface ModalOptions {
@@ -23,18 +23,18 @@ export const ModalProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     const [isOpen, setIsOpen] = useState(false);
     const [options, setOptions] = useState<ModalOptions | null>(null);
 
-    const showModal = (opts: ModalOptions) => {
+    const showModal = useCallback((opts: ModalOptions) => {
         setOptions(opts);
         setIsOpen(true);
-    };
+    }, []);
 
-    const hideModal = () => {
+    const hideModal = useCallback(() => {
         setIsOpen(false);
         // Clear options after animation would theoretically finish, but here immediate is fine
         setTimeout(() => setOptions(null), 300);
-    };
+    }, []);
 
-    const showAlert = (message: string, title: string = 'Notice') => {
+    const showAlert = useCallback((message: string, title: string = 'Notice') => {
         showModal({
             title,
             body: message,
@@ -42,9 +42,9 @@ export const ModalProvider: React.FC<{ children: ReactNode }> = ({ children }) =
             confirmText: 'OK',
             onConfirm: hideModal
         });
-    };
+    }, [showModal, hideModal]);
 
-    const showConfirm = (message: string, onConfirm: () => void, title: string = 'Confirm') => {
+    const showConfirm = useCallback((message: string, onConfirm: () => void, title: string = 'Confirm') => {
         showModal({
             title,
             body: message,
@@ -55,15 +55,15 @@ export const ModalProvider: React.FC<{ children: ReactNode }> = ({ children }) =
                 hideModal();
             }
         });
-    };
+    }, [showModal, hideModal]);
 
-    const handleConfirm = () => {
+    const handleConfirm = useCallback(() => {
         if (options?.onConfirm) {
             options.onConfirm();
         } else {
             hideModal();
         }
-    };
+    }, [options, hideModal]);
 
     return (
         <ModalContext.Provider value={{ showModal, hideModal, showAlert, showConfirm }}>

@@ -1,6 +1,5 @@
 import React from 'react';
-import { Routes, Route, Link } from 'react-router-dom';
-import { useAuth } from './context/AuthContext';
+import { Routes, Route } from 'react-router-dom';
 import './styles/App.css';
 import HomePage from './pages/HomePage';
 import CreateGamePage from './pages/CreateGamePage';
@@ -19,8 +18,6 @@ import { AudioProvider } from './context/AudioContext';
 import AudioPlayer from './components/AudioPlayer';
 import { LanguageProvider } from './context/LanguageContext';
 import LanguageSwitcher from './components/LanguageSwitcher';
-
-import ProtectedRoute from './components/ProtectedRoute';
 
 import UserIcon from './components/UserIcon';
 import Branding from './components/Branding';

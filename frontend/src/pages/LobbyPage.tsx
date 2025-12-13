@@ -1,5 +1,5 @@
 import React, { useContext, useEffect, useState, useRef } from 'react';
-import { useParams, useNavigate, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
 import { GameContext, GameData, User } from '../context/GameContext';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
@@ -38,6 +38,15 @@ interface QuestionPayload {
   userAnswer?: string;
 }
 
+const getSafeStorage = (key: string) => {
+  try {
+    return localStorage.getItem(key);
+  } catch (e) {
+    console.warn('Storage access restricted', e);
+    return null;
+  }
+};
+
 const LobbyPage: React.FC = () => {
   const { roomCode } = useParams();
   const navigate = useNavigate();
@@ -65,15 +74,6 @@ const LobbyPage: React.FC = () => {
   const [jokerResult, setJokerResult] = useState<{ wrongAnswersToRemove?: string[] } | null>(null);
 
   const socketRef = useRef<Socket | null>(null);
-
-  const getSafeStorage = (key: string) => {
-    try {
-      return localStorage.getItem(key);
-    } catch (e) {
-      console.warn('Storage access restricted', e);
-      return null;
-    }
-  };
 
   const setGameDataFromContext = setGameData!;
 
@@ -124,7 +124,7 @@ const LobbyPage: React.FC = () => {
   }, [roomCode, setGameDataFromContext]);
 
   useEffect(() => {
-    if (!roomCode || !context) return;
+    if (!roomCode || !setGameDataFromContext) return;
     if (!socketRef.current) {
       const storedUserId = getSafeStorage('userId');
       socketRef.current = io(API_BASE_URL, {
@@ -337,7 +337,7 @@ const LobbyPage: React.FC = () => {
       if (socket.connected) socket.disconnect();
       socketRef.current = null;
     };
-  }, [roomCode, setGameDataFromContext, navigate]);
+  }, [roomCode, setGameDataFromContext, navigate, getAudioForLevel, playSFX, playTrack, stopAll, showAlert]);
 
   const handleUseJoker = async (jokerType: string) => {
     if (!roomCode || !currentQuestion) return;
