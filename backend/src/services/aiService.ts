@@ -69,18 +69,33 @@ export class AiService {
             const prompt = `
                 Generate ${amountToGenerate} unique trivia questions for the category "${category}".
                 
+                PROMPT VARIATION SEED: ${Date.now()} (Use this to randomize your output focus)
+
                 CRITICAL CULTURAL INSTRUCTION:
                 Prioritize questions with **International** relevance first, then **European** relevance, then **German** relevance.
                 Avoid questions that are too obscure or US-centric.
 
-                STYLE GUIDELINES (IMPORTANT):
-                1. **"One Sentence" Rule**: Questions must be straightforward and concise. Avoid nested sentences or complex grammar.
-                2. **"Game Show" Style**:
-                   - Easy questions (Levels 1-4) should be fun, possibly involve wordplay or puns, and be widely known facts.
-                   - Higher levels should be difficult due to obscurity of facts, NOT complexity of the question text.
+                CREATIVITY & VARIETY INSTRUCTIONS (VERY IMPORTANT):
+                1. **AVOID REPETITION**: Do not stick to common trivia tropes (e.g. only asking for capitals or chemical symbols). Explore diverse sub-topics within "${category}".
+                2. **UNIQUE PHRASING**: Do not start every question with "What is..." or "Who is...". Use varied sentence structures (e.g., "This famous painter...", "Known for his blue period...", "If you mix red and yellow...").
+                3. **HUMOR & WORDPLAY (REQUIRED for Easy Questions)**: 
+                   - Level 1-4 questions MUST be entertaining. Use puns, dad jokes, or absurdly obvious distractors.
+                   - Example: "Which distinctively orange vegetable is known for being good for your eyes?" (Answer: Carrot) NOT "What is a carrot?".
+                   - Make the player smile.
+                
+                STYLE GUIDELINES:
+                1. **Concise & Clear**: Questions should be easy to read and digest. 
+                   - Limit to 1-2 short sentences. 
+                   - Avoid complex clauses or "academic" phrasing.
+                   - **NO SPOILERS**: Never include abbreviations or details in the question that reveal the answer (e.g. do not write "What does the CPU (Central Processing Unit) do?" if the answer is CPU).
+                2. **Difficulty Curve**:
+                   - **Easy (L1-4)**: Common knowledge, funny, wordplay, "easy-peasy".
+                   - **Medium (L5-9)**: High school general knowledge.
+                   - **Hard (L10-13)**: obscure facts, specific dates, or lesser-known figures.
+                   - **Very Hard (L14-15)**: Expert knowledge, almost impossible for the average person.
                 3. **Answer Formatting**:
                    - Answer options must be ONLY the answer itself.
-                   - NEVER include explanations, parenthesis, or context in the answer text (e.g. "Paris" NOT "Paris (Capital of France)").
+                   - NEVER include explanations, parenthesis, or context in the answer text.
                 
                 Create questions with varying difficulties based on this mapping:
                 - ${easyCount} Easy questions (Levels 1-4)
