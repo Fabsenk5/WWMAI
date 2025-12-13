@@ -37,7 +37,7 @@ graph TD
         Coord --> Dep[Deployment Manager]
     end
 ```
-
+![alt text](image.png)
 ---
 
 ## 2. Agent Roles, Prompts & Tasks

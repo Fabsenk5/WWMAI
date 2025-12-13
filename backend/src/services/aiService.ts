@@ -73,13 +73,24 @@ export class AiService {
                 Prioritize questions with **International** relevance first, then **European** relevance, then **German** relevance.
                 Avoid questions that are too obscure or US-centric.
 
+                STYLE GUIDELINES (IMPORTANT):
+                1. **"One Sentence" Rule**: Questions must be straightforward and concise. Avoid nested sentences or complex grammar.
+                2. **"Game Show" Style**:
+                   - Easy questions (Levels 1-4) should be fun, possibly involve wordplay or puns, and be widely known facts.
+                   - Higher levels should be difficult due to obscurity of facts, NOT complexity of the question text.
+                3. **Answer Formatting**:
+                   - Answer options must be ONLY the answer itself.
+                   - NEVER include explanations, parenthesis, or context in the answer text (e.g. "Paris" NOT "Paris (Capital of France)").
+                
                 Create questions with varying difficulties based on this mapping:
                 - ${easyCount} Easy questions (Levels 1-4)
                 - ${mediumCount} Medium questions (Levels 5-9)
                 - ${hardCount} Hard questions (Levels 10-13)
                 - ${veryHardCount} Very Hard questions (Levels 14-15)
 
-                Return the output strictly as a JSON array of objects with this format:
+                Return the output strictly as a JSON array of questions.
+                Ensure the JSON is valid and contains no markdown formatting.
+                Expected JSON format:
                 {
                     "question": "The question text (English)",
                     "correct_answer": "The correct answer (English)",
@@ -91,7 +102,6 @@ export class AiService {
                         "es": { "question": "Spanish Q", "correct_answer": "Spanish A", "incorrect_answers": ["Spanish W1", "Spanish W2", "Spanish W3"] }
                     }
                 }
-                Ensure the JSON is valid and contains no markdown formatting.
             `;
 
             let result;
