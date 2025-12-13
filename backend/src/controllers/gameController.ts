@@ -37,7 +37,9 @@ export class GameController {
 
             for (const p of playersRes.rows) {
                 console.log(`[finalizeGameStats] Processing player:`, p);
-                if (!/^\d+$/.test(p.userid)) {
+
+                // Safe check for numeric ID (registered user)
+                if (!p.userid || !/^\d+$/.test(String(p.userid))) {
                     console.log(`[finalizeGameStats] Skipping guest/invalid user: ${p.userid}`);
                     continue; // Skip guests
                 }
@@ -60,18 +62,18 @@ export class GameController {
                 if (isWinner) {
                     await this.db.query(`
                         UPDATE users SET 
-                            games_played = games_played + 1,
-                            games_won = games_won + 1,
-                            total_earnings = total_earnings + $1,
-                            current_win_streak = current_win_streak + 1,
-                            longest_win_streak = GREATEST(longest_win_streak, current_win_streak + 1)
+                            games_played = COALESCE(games_played, 0) + 1,
+                            games_won = COALESCE(games_won, 0) + 1,
+                            total_earnings = COALESCE(total_earnings, 0) + $1,
+                            current_win_streak = COALESCE(current_win_streak, 0) + 1,
+                            longest_win_streak = GREATEST(COALESCE(longest_win_streak, 0), COALESCE(current_win_streak, 0) + 1)
                         WHERE id = $2
                     `, [earnings, uid]);
                 } else {
                     await this.db.query(`
                         UPDATE users SET 
-                            games_played = games_played + 1,
-                            total_earnings = total_earnings + $1,
+                            games_played = COALESCE(games_played, 0) + 1,
+                            total_earnings = COALESCE(total_earnings, 0) + $1,
                             current_win_streak = 0
                         WHERE id = $2
                     `, [earnings, uid]);

@@ -68,6 +68,13 @@ export const syncDatabaseSchema = async () => {
         await addColumnIfNotExists('users', 'avatar_url', 'VARCHAR(255)');
         await addColumnIfNotExists('users', 'subscription_end_date', 'TIMESTAMP WITH TIME ZONE');
 
+        // Stats columns
+        await addColumnIfNotExists('users', 'games_played', 'INT DEFAULT 0');
+        await addColumnIfNotExists('users', 'games_won', 'INT DEFAULT 0');
+        await addColumnIfNotExists('users', 'total_earnings', 'INT DEFAULT 0');
+        await addColumnIfNotExists('users', 'current_win_streak', 'INT DEFAULT 0');
+        await addColumnIfNotExists('users', 'longest_win_streak', 'INT DEFAULT 0');
+
         // 4. Ensure 'players' table exists
         await client.query(`
              CREATE TABLE IF NOT EXISTS players (
