@@ -4,6 +4,7 @@ import { useParams } from 'react-router-dom';
 import { GameContext, Question } from '../context/GameContext';
 import { useModal } from '../context/ModalContext';
 import { useAudio } from '../context/AudioContext';
+import { useAuth } from '../context/AuthContext'; // Added import
 import QuestionDisplay from '../components/QuestionDisplay';
 import Scoreboard from '../components/Scoreboard';
 import { API_BASE_URL } from '../config/api';
@@ -14,6 +15,7 @@ const GamePage: React.FC = () => {
   const { t } = useTranslation();
   const { id } = useParams<{ id: string }>();
   const { showAlert } = useModal();
+  const { user } = useAuth(); // Added useAuth
   const { playTrack, playSFX, getAudioForLevel, stopAll } = useAudio();
   console.log(`[GamePage] Mounted. ID from URL: ${id}`);
 
@@ -94,9 +96,10 @@ const GamePage: React.FC = () => {
       socketRef.current = socket;
 
       socket.on('connect', () => {
-        const currentUserId = localStorage.getItem('userId');
-        if (currentUserId && roomCode) {
-          socket.emit('joinRoom', { roomCode, userId: currentUserId });
+        // Prioritize authenticated user ID, fallback to localStorage
+        const effectiveUserId = user ? String(user.id) : localStorage.getItem('userId');
+        if (effectiveUserId && roomCode) {
+          socket.emit('joinRoom', { roomCode, userId: effectiveUserId });
         }
       });
 
@@ -164,7 +167,7 @@ const GamePage: React.FC = () => {
         }
       };
     }
-  }, [roomCode, setGameData, getAudioForLevel, playSFX, playTrack, stopAll]);
+  }, [roomCode, setGameData, getAudioForLevel, playSFX, playTrack, stopAll, user]);
 
   // --- Effect 4: Poll for players ---
   useEffect(() => {

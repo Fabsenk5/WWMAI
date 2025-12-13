@@ -78,7 +78,7 @@ const GameContext = createContext<GameContextType | undefined>(undefined);
 // const BASE_URL = 'http://localhost:5000';
 
 export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-    const { token } = useAuth(); // Get token from AuthContext
+    const { token, user } = useAuth(); // Get token and user from AuthContext
     const [questions, setQuestions] = useState<Question[]>([]); // Consider removing if using gameData.questions
     const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
     const [score, setScore] = useState(0); // Consider moving player-specific state
@@ -258,7 +258,14 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         setLoading(true);
         setError(null);
         try {
-            const response = await axios.post(`${API_BASE_URL}/api/games/${gameId}/answer`, { questionId, answer });
+            // Determine effective user info
+            const effectiveUserId = user ? String(user.id) : localStorage.getItem('userId');
+
+            const response = await axios.post(`${API_BASE_URL}/api/games/${gameId}/answer`, {
+                questionId,
+                answer,
+                userId: effectiveUserId
+            });
             // Assuming the backend response includes correctness and potentially updated player scores/lives
             const { isCorrect, users } = response.data; // Rename players to users
 
@@ -288,7 +295,7 @@ export const GameProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         } finally {
             setLoading(false);
         }
-    }, [gameData, currentQuestionIndex]); // Add dependencies
+    }, [gameData, currentQuestionIndex, user]); // Add dependencies
 
     return (
         <GameContext.Provider value={{
