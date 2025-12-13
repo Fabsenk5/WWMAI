@@ -54,7 +54,8 @@ export class GameController {
                 } else {
                     // Co-op
                     isWinner = result === 'win';
-                    earnings = isWinner ? 1000000 : (p.score || prize); // Use Level prize for Co-op
+                    // If not winner, get score. If score is missing (bug safeguard), get prize for COMPLETED level (current - 1).
+                    earnings = isWinner ? 1000000 : (p.score || getPrizeForLevel(finalLevel - 1));
                 }
 
                 console.log(`[finalizeGameStats] Updating user ${uid}. Winner: ${isWinner}, Earnings: ${earnings}`);
