@@ -1,6 +1,7 @@
 import React, { useState, useContext, useEffect } from 'react'; // Import useContext and useEffect
 import { useNavigate } from 'react-router-dom';
 import { GameContext } from '../context/GameContext'; // Import GameContext
+import { useAuth } from '../context/AuthContext'; // Import useAuth
 import axios from 'axios'; // Import axios
 import '../styles/Forms.css'; // Import shared form styles
 
@@ -14,31 +15,24 @@ const JoinGamePage: React.FC = () => {
     const [userName, setUserName] = useState(''); // Rename playerName to userName
     // Use context for state management
     const { loading, error: contextError } = useContext(GameContext)!; // Keep GameContext for loading/error
-    // const { user } = useAuth(); // Unused
+    const { user } = useAuth(); // Get user from AuthContext
     const [localError, setLocalError] = useState<string | null>(null); // Local error for form validation
     const navigate = useNavigate();
-    // But we want the NAME. 
-
-    // Let's modify the existing useEffect to try and fetch name if not in localStorage?
-    // Or just check 'userName' in localStorage? 
-    // The previous code does: localStorage.setItem('userName', userName);
-    // so if they joined before, it might be there.
-    // But if they logged in via /login, the name is in AuthContext or stored in token?
-
-    // Best approach: Use localStorage 'userName' if available OR 'username' from AuthContext (if I can access it).
-    // Let's blindly try to read 'userName' from localStorage first.
 
     useEffect(() => {
-        const storedName = localStorage.getItem('userName');
-        if (storedName) {
-            setUserName(storedName);
+        // Pre-fill fields if user is logged in
+        if (user) {
+            setUserName(user.username);
+        } else {
+            const storedName = localStorage.getItem('userName');
+            if (storedName) {
+                setUserName(storedName);
+            }
         }
 
-        const userId = localStorage.getItem('userId');
-        if (userId) {
-            console.log('Existing userId found in localStorage:', userId);
-        } else {
-            console.log('No userId found in localStorage. A new one will be generated upon joining.');
+        const storedUserId = localStorage.getItem('userId');
+        if (storedUserId) {
+            console.log('Existing userId found in localStorage:', storedUserId);
         }
 
         // Parse roomCode from URL
@@ -47,7 +41,7 @@ const JoinGamePage: React.FC = () => {
         if (code) {
             setRoomCode(code);
         }
-    }, []);
+    }, [user]);
 
     const handleJoinGame = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -62,7 +56,7 @@ const JoinGamePage: React.FC = () => {
             return;
         }
 
-        const userId = localStorage.getItem('userId');
+        const userId = user ? String(user.id) : localStorage.getItem('userId');
 
         axios.post(`${API_BASE_URL}/api/games/join`, { roomCode, userName, userId }) // Rename playerName to userName
             .then((response) => {

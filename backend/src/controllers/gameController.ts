@@ -539,6 +539,12 @@ export class GameController {
                 // Use provided userId if available, otherwise generate a new guest ID
                 const newUserId = userId || `user_${Math.random().toString(36).substring(2, 10)}`;
                 console.log('Creating new player with userId:', newUserId);
+
+                // Start Transaction to ensure cleanup and insert happen atomically? Not strictly necessary but good practice.
+                // For now, just DELETE before INSERT to fix the unique constraint violation.
+                // If a user is joining a new room, they leave the old one.
+                await this.db.query('DELETE FROM players WHERE userId = $1', [newUserId]);
+
                 // Fix: Initialize lives from Game Settings
                 const insertQuery = `INSERT INTO players (userId, room_code, name, lives) VALUES ($1, $2, $3, $4) RETURNING *`;
                 const values = [newUserId, roomCode, userName, initialLives];
