@@ -14,6 +14,7 @@ import {
     updateCategoryStatus,
     updateAllQuestionsStatus,
     regenerateQuestions,
+    updateQuestionDifficulty,
     Question,
     QuestionsResponse,
     User
@@ -84,6 +85,19 @@ const AdminDashboard: React.FC = () => {
             setUserMessage('Failed to load users');
         } finally {
             setLoadingUsers(false);
+        }
+    };
+
+    const handleUpdateDifficulty = async (id: number, newDifficulty: string) => {
+        try {
+            const result = await updateQuestionDifficulty(id, newDifficulty, adminPassword);
+            if (result.success) {
+                setQuestions(questions.map(q => q.id === id ? { ...q, difficulty: newDifficulty } : q));
+            } else {
+                console.error('Failed to update difficulty');
+            }
+        } catch (error) {
+            console.error('Error updating difficulty', error);
         }
     };
 
@@ -470,7 +484,25 @@ const AdminDashboard: React.FC = () => {
                                                         {q.category}
                                                     </span>
                                                 </td>
-                                                <td style={{ padding: '10px' }}>{q.difficulty}</td>
+                                                <td style={{ padding: '10px' }}>
+                                                    <select
+                                                        value={q.difficulty}
+                                                        onChange={(e) => handleUpdateDifficulty(q.id, e.target.value)}
+                                                        style={{
+                                                            padding: '4px',
+                                                            borderRadius: '4px',
+                                                            border: '1px solid var(--border-color)',
+                                                            backgroundColor: 'var(--bg-secondary)',
+                                                            color: 'var(--text-primary)'
+                                                        }}
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    >
+                                                        <option value="easy">Easy</option>
+                                                        <option value="medium">Medium</option>
+                                                        <option value="hard">Hard</option>
+                                                        <option value="very_hard">Very Hard</option>
+                                                    </select>
+                                                </td>
                                                 <td style={{ padding: '10px' }}>{q.text}</td>
                                                 <td style={{ padding: '10px' }}>{q.correctAnswer}</td>
                                                 <td style={{ padding: '10px' }}>

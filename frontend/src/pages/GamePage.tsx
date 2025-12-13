@@ -29,6 +29,8 @@ const GamePage: React.FC = () => {
   } = useContext(GameContext)!;
 
   const [gameEnded, setGameEnded] = useState(false);
+  const [gameEndMessage, setGameEndMessage] = useState('');
+  const [isWinner, setIsWinner] = useState(false);
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
   const [answerSubmitted, setAnswerSubmitted] = useState(false);
   const [questionError, setQuestionError] = useState<string | undefined>(undefined);
@@ -103,7 +105,24 @@ const GamePage: React.FC = () => {
         }
       });
 
-      socket.on('gameEnded', () => setGameEnded(true));
+      socket.on('gameEnded', (data: { message: string, winnerIds?: string[], gameMode?: string }) => {
+        setGameEnded(true);
+        setGameEndMessage(data.message);
+
+        const effectiveUserId = user ? String(user.id) : localStorage.getItem('userId');
+
+        if (data.gameMode === 'survival' && data.winnerIds) {
+          if (effectiveUserId && data.winnerIds.includes(effectiveUserId)) {
+            setIsWinner(true);
+          } else {
+            setIsWinner(false);
+          }
+        } else {
+          // Cooperative or default fallback
+          const won = data.message.toLowerCase().includes('victory') || data.message.toLowerCase().includes('won');
+          setIsWinner(won);
+        }
+      });
 
       socket.on('revealAnswers', (data) => {
         // Audio: Win/Lose
@@ -288,7 +307,27 @@ const GamePage: React.FC = () => {
       </div>
 
       {gameEnded ? (
-        <h2>{t('game_over')}</h2>
+        <div className="text-center" style={{ padding: '40px', textAlign: 'center' }}>
+          {isWinner ? (
+            <div>
+              <h1 style={{ color: 'var(--success-color)', fontSize: '3rem', marginBottom: '20px' }}>🏆 VICTORY! 🏆</h1>
+              <div style={{ fontSize: '4rem', marginBottom: '20px' }}>🎉</div>
+            </div>
+          ) : (
+            <div>
+              <h1 style={{ color: 'var(--danger-color)', fontSize: '3rem', marginBottom: '20px' }}>💀 GAME OVER 💀</h1>
+              <div style={{ fontSize: '4rem', marginBottom: '20px' }}>👻</div>
+            </div>
+          )}
+          <h2 style={{ color: 'var(--text-primary)' }}>{gameEndMessage || t('game_over')}</h2>
+          <button
+            className="button"
+            style={{ marginTop: '30px', backgroundColor: 'var(--text-secondary)' }}
+            onClick={() => window.location.href = '/lobby'}
+          >
+            Return to Lobby
+          </button>
+        </div>
       ) : gameData?.status !== 'started' ? (
         <button onClick={startGame} className="button">{t('start_game')}</button>
       ) : (

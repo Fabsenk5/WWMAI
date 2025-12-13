@@ -513,4 +513,24 @@ export class QuestionModel {
             throw new Error('Failed to update global question status');
         }
     }
+
+    /**
+     * Update difficulty for a specific question
+     */
+    async updateQuestionDifficulty(id: number, difficulty: string): Promise<boolean> {
+        try {
+            // Validate difficulty
+            const validDifficulties = ['easy', 'medium', 'hard', 'very_hard'];
+            if (!validDifficulties.includes(difficulty)) {
+                throw new Error('Invalid difficulty level');
+            }
+
+            const query = 'UPDATE questions SET difficulty = $1 WHERE id = $2';
+            const result = await this.db.query(query, [difficulty, id]);
+            return (result.rowCount || 0) > 0;
+        } catch (error) {
+            console.error(`Error updating difficulty for question ${id}:`, error);
+            throw new Error('Failed to update question difficulty');
+        }
+    }
 }

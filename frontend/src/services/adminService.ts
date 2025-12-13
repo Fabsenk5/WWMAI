@@ -190,3 +190,12 @@ export const regenerateQuestions = async (password: string): Promise<{ success: 
     });
     return response.json();
 };
+
+export const updateQuestionDifficulty = async (id: number, difficulty: string, password: string): Promise<{ success: boolean; message: string }> => {
+    const response = await fetch(`${API_URL}/questions/${id}/difficulty`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ difficulty, password }),
+    });
+    return response.json();
+};

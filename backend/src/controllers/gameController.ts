@@ -881,13 +881,14 @@ export class GameController {
                     const allAnswersResult = await this.db.query(allAnswersQuery, [current_question_id, roomCode, current_level]);
 
                     // Check if *anyone* is still alive to continue
-                    const anySurvivorsResult = await this.db.query(`SELECT COUNT(*) as count FROM players WHERE room_code = $1 AND lives > 0`, [roomCode]);
-                    const survivors = parseInt(anySurvivorsResult.rows[0].count, 10);
+                    const survivorsResult = await this.db.query(`SELECT userId FROM players WHERE room_code = $1 AND lives > 0`, [roomCode]);
+                    const survivors = survivorsResult.rows.map(r => r.userId);
+                    const survivorCount = survivors.length;
 
                     let gameEnded = false;
                     let message = 'Round finished.';
 
-                    if (survivors === 0) {
+                    if (survivorCount === 0) {
                         gameEnded = true;
                         message = 'Game Over! No survivors.';
                         await this.db.query(`UPDATE games SET status = 'ended' WHERE game_id = $1`, [gameId]);
@@ -916,7 +917,12 @@ export class GameController {
                         // Delay Game Over for 30s + waitTime to let users see results
                         const finalMessage = message === 'Game Over! Victory!' ? 'You won - Victory!' : message;
                         setTimeout(() => {
-                            this.io.to(roomCode).emit('gameEnded', { message: finalMessage });
+                            // Include winnerIds in the payload so frontend can show tailored screens
+                            this.io.to(roomCode).emit('gameEnded', {
+                                message: finalMessage,
+                                winnerIds: survivors,
+                                gameMode: 'survival'
+                            });
                         }, (waitTimeInfo + 30) * 1000);
                     }
 
@@ -1076,10 +1082,11 @@ export class GameController {
                 }
             } else {
                 // Survival
-                const playerQuery = `SELECT jokers_used FROM players WHERE userId = $1`;
-                const playerResult = await this.db.query(playerQuery, [userId]);
+                // FIXED: Scope to the current game using game_id to avoid cross-game collisions
+                const playerQuery = `SELECT jokers_used FROM players WHERE userId = $1 AND game_id = $2`;
+                const playerResult = await this.db.query(playerQuery, [userId, game_id]);
                 if (playerResult.rows.length === 0) {
-                    res.status(404).json({ error: 'Player not found.' });
+                    res.status(404).json({ error: 'Player not found in this game.' });
                     return;
                 }
                 const playerJokers = playerResult.rows[0].jokers_used || [];

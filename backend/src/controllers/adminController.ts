@@ -363,6 +363,35 @@ export class AdminController {
     }
 
     /**
+     * Update difficulty for a specific question
+     */
+    updateQuestionDifficulty = async (req: Request, res: Response) => {
+        const { difficulty, password } = req.body;
+        const id = parseInt(req.params.id);
+
+        if (password !== this.adminPassword) {
+            res.status(401).json({ error: 'Unauthorized: Invalid password' });
+            return;
+        }
+
+        if (isNaN(id)) {
+            res.status(400).json({ error: 'Invalid question ID' });
+            return;
+        }
+
+        try {
+            const success = await this.questionModel.updateQuestionDifficulty(id, difficulty);
+            if (success) {
+                res.json({ success: true, message: `Question difficulty updated to ${difficulty}` });
+            } else {
+                res.status(404).json({ error: 'Question not found' });
+            }
+        } catch (error) {
+            res.status(500).json({ error: 'Failed to update question difficulty' });
+        }
+    }
+
+    /**
      * Update status for all questions in a category
      */
     updateCategoryStatus = async (req: Request, res: Response) => {
