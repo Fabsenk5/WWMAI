@@ -422,6 +422,10 @@ const AdminDashboard: React.FC = () => {
                                     value={filterDifficulty}
                                     onChange={(e) => { setFilterDifficulty(e.target.value); setPage(1); }}
                                 >
+                                    <option value="">All Difficulties</option>
+                                    <option value="easy">Easy</option>
+                                    <option value="medium">Medium</option>
+                                    <option value="hard">Hard</option>
                                     <option value="very_hard">Very Hard</option>
                                 </select>
                             </div>
