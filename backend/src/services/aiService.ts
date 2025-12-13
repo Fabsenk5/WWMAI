@@ -120,23 +120,32 @@ export class AiService {
             `;
 
             let result;
-            try {
-                // Try Primary Model
-                const model = this.genAI.getGenerativeModel({ model: "gemini-2.5-flash-preview-09-2025" });
-                result = await model.generateContent(prompt);
-            } catch (err: any) {
-                // Check if error is 503 (Service Unavailable / Overloaded)
-                if (err.message && (err.message.includes('503') || err.message.includes('Service Unavailable') || err.message.includes('overloaded'))) {
-                    console.warn(`[AiService] ⚠️ Primary model overloaded (503). Switching to fallback: "gemini-2.5-flash-lite-preview-09-2025"`);
+            // Priority: Newest/Best -> Standard Flash -> Lite Fallback
+            const models = ["gemini-3-pro-preview", "gemini-2.5-flash-preview-09-2025", "gemini-2.5-flash-lite-preview-09-2025"];
 
-                    // Try Fallback Model
-                    const fallbackModel = this.genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite-preview-09-2025" });
-                    result = await fallbackModel.generateContent(prompt);
-                } else {
-                    // Re-throw if it's not a 503 or if fallback fails (caught by outer try-catch)
-                    throw err;
+            for (const modelName of models) {
+                try {
+                    const model = this.genAI.getGenerativeModel({ model: modelName });
+                    result = await model.generateContent(prompt);
+                    break; // Success, exit loop
+                } catch (err: any) {
+                    const isLast = modelName === models[models.length - 1];
+                    const isOverloaded = err.message && (err.message.includes('503') || err.message.includes('Service Unavailable') || err.message.includes('overloaded'));
+
+                    if (isOverloaded) {
+                        console.warn(`[AiService] ⚠️ Model "${modelName}" overloaded (503). ${isLast ? 'All models failed.' : 'Switching to next model...'}`);
+                    } else {
+                        console.warn(`[AiService] ⚠️ Model "${modelName}" failed: ${err.message}. ${isLast ? 'All models failed.' : 'Switching to next model...'}`);
+                    }
+
+                    if (isLast) throw err; // Throw the final error if we ran out of models
                 }
             }
+
+            if (!result) {
+                throw new Error("Generative AI produced no result.");
+            }
+
             const response = result.response;
             let text = response.text();
 
