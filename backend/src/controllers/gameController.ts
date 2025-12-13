@@ -498,8 +498,8 @@ export class GameController {
                 return;
             }
 
-            // Use the correct column for maximum player count
-            const roomQuery = `SELECT player_count FROM games WHERE room_code = $1`; // Use player_count instead of user_count
+            // Use the correct column for maximum player count and lives/mode
+            const roomQuery = `SELECT player_count, lives, game_mode FROM games WHERE room_code = $1`;
             const roomResult = await this.db.query(roomQuery, [roomCode]);
 
             if (roomResult.rows.length === 0) {
@@ -508,7 +508,10 @@ export class GameController {
             }
 
             // Validate if the room has reached the maximum number of players
-            const maxPlayers = roomResult.rows[0].player_count; // Use player_count for max players
+            const maxPlayers = roomResult.rows[0].player_count;
+            const initialLives = roomResult.rows[0].lives || 3;
+            // const gameMode = roomResult.rows[0].game_mode; // Not strictly needed for logic unless we suppress lives for co-op logic here, but standard is uniform.
+
             const userCountQuery = `SELECT COUNT(*) AS user_count FROM players WHERE room_code = $1`;
             const userCountResult = await this.db.query(userCountQuery, [roomCode]);
 
@@ -536,8 +539,9 @@ export class GameController {
                 // Generate a new userId and create a new player
                 const newUserId = `user_${Math.random().toString(36).substring(2, 10)}`;
                 console.log('Generated new userId:', newUserId);
-                const insertQuery = `INSERT INTO players (userId, room_code, name) VALUES ($1, $2, $3) RETURNING *`;
-                const values = [newUserId, roomCode, userName];
+                // Fix: Initialize lives from Game Settings
+                const insertQuery = `INSERT INTO players (userId, room_code, name, lives) VALUES ($1, $2, $3, $4) RETURNING *`;
+                const values = [newUserId, roomCode, userName, initialLives];
                 const insertResult = await this.db.query(insertQuery, values);
                 player = insertResult.rows[0];
             }

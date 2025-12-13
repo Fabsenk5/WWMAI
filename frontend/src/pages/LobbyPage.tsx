@@ -50,7 +50,7 @@ const getSafeStorage = (key: string) => {
 const LobbyPage: React.FC = () => {
   const { roomCode } = useParams();
   const navigate = useNavigate();
-  const { user } = useAuth();
+  const { user, isLoading } = useAuth(); // Destructure isLoading
   const { language } = useLanguage();
   const { t } = useTranslation();
   const context = useContext(GameContext);
@@ -72,6 +72,8 @@ const LobbyPage: React.FC = () => {
   const [teamAnswerInfo, setTeamAnswerInfo] = useState<{ answer: string, isCorrect: boolean } | null>(null);
 
   const [jokerResult, setJokerResult] = useState<{ wrongAnswersToRemove?: string[] } | null>(null);
+
+  // REMOVED early return here to avoid conditional hook execution error
 
   const socketRef = useRef<Socket | null>(null);
 
@@ -120,14 +122,13 @@ const LobbyPage: React.FC = () => {
       }
     };
 
-    if (roomCode) hydrateState();
-  }, [roomCode, setGameDataFromContext]);
+    if (roomCode && !isLoading) hydrateState();
+  }, [roomCode, setGameDataFromContext, isLoading]);
 
   useEffect(() => {
-    if (!roomCode || !setGameDataFromContext) return;
+    if (!roomCode || !setGameDataFromContext || isLoading) return;
 
-    // Determine effective user info
-    // If logged in (from AuthContext), use that. Otherwise fallback to storage or random guest.
+    // (Deferring replacement until I locate the return statement - I need to scroll further down) (from AuthContext), use that. Otherwise fallback to storage or random guest.
     const effectiveUserId = user ? String(user.id) : (getSafeStorage('userId') || `user-${Math.random().toString(36).substr(2, 9)}`);
     const effectiveUserName = user ? user.username : (getSafeStorage('userName') || 'Guest');
 
@@ -451,6 +452,8 @@ const LobbyPage: React.FC = () => {
 
   if (isValidRoom === null) return <div className="loading">Validating...</div>;
   if (!isValidRoom) return <div className="error">Invalid room.</div>;
+  // Wait for auth to initialize for rendering
+  if (isLoading) return <div className="loading-container">Loading...</div>;
 
   return (
     <div className="lobby-page">
