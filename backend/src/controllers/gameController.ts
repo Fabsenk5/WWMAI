@@ -536,9 +536,9 @@ export class GameController {
             }
 
             if (!player) {
-                // Generate a new userId and create a new player
-                const newUserId = `user_${Math.random().toString(36).substring(2, 10)}`;
-                console.log('Generated new userId:', newUserId);
+                // Use provided userId if available, otherwise generate a new guest ID
+                const newUserId = userId || `user_${Math.random().toString(36).substring(2, 10)}`;
+                console.log('Creating new player with userId:', newUserId);
                 // Fix: Initialize lives from Game Settings
                 const insertQuery = `INSERT INTO players (userId, room_code, name, lives) VALUES ($1, $2, $3, $4) RETURNING *`;
                 const values = [newUserId, roomCode, userName, initialLives];
