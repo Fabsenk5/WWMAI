@@ -833,10 +833,10 @@ export class GameController {
                 return;
             }
 
-            // Get Correct Answer
-            const questionQuery = `SELECT correct_answer FROM questions WHERE id = $1`;
+            // Get Correct Answer AND Category
+            const questionQuery = `SELECT correct_answer, category FROM questions WHERE id = $1`;
             const questionResult = await this.db.query(questionQuery, [current_question_id]);
-            const { correct_answer } = questionResult.rows[0];
+            const { correct_answer, category } = questionResult.rows[0];
             const isIndividualCorrect = answer === correct_answer;
 
             // --- SURVIVAL MODE LOGIC ---
@@ -851,8 +851,8 @@ export class GameController {
 
                 // 2. Record Answer
                 await this.db.query(
-                    `INSERT INTO player_answers (user_id, question_id, answer, is_correct, room_code, level) VALUES ($1, $2, $3, $4, $5, $6)`,
-                    [userId, current_question_id, answer, isIndividualCorrect, roomCode, current_level]
+                    `INSERT INTO player_answers (user_id, question_id, answer, is_correct, room_code, level, category) VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+                    [userId, current_question_id, answer, isIndividualCorrect, roomCode, current_level, category]
                 );
 
                 // 3. Check for completion (All living players answered)
@@ -935,10 +935,10 @@ export class GameController {
 
             // Record answer (temporarily mark is_correct based on individual, but game logic uses voting)
             const recordAnswerQuery = `
-                INSERT INTO player_answers (user_id, question_id, answer, is_correct, room_code, level)
-                VALUES ($1, $2, $3, $4, $5, $6)
+                INSERT INTO player_answers (user_id, question_id, answer, is_correct, room_code, level, category)
+                VALUES ($1, $2, $3, $4, $5, $6, $7)
             `;
-            await this.db.query(recordAnswerQuery, [userId, current_question_id, answer, isIndividualCorrect, roomCode, current_level]);
+            await this.db.query(recordAnswerQuery, [userId, current_question_id, answer, isIndividualCorrect, roomCode, current_level, category]);
 
             // Check if all players have answered
             const countQuery = `SELECT COUNT(*) as count FROM player_answers WHERE question_id = $1 AND room_code = $2 AND level = $3`;

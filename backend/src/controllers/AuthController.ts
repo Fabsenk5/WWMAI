@@ -128,15 +128,14 @@ export class AuthController {
             // Removed global premium check to preserve subscription integrity.
             // Frontend will verify global status.
 
-            // Fetch Category Stats
+            // Fetch Category Stats (Decoupled from questions table)
             const catQuery = `
-                SELECT q.category, 
+                SELECT pa.category, 
                        COUNT(*) FILTER (WHERE pa.is_correct) as correct_count,
                        COUNT(*) FILTER (WHERE NOT pa.is_correct) as incorrect_count
                 FROM player_answers pa
-                JOIN questions q ON pa.question_id = q.id
                 WHERE pa.user_id = $1
-                GROUP BY q.category
+                GROUP BY pa.category
             `;
             const catResult = await this.db.query(catQuery, [userId]);
 

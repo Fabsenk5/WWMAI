@@ -1,3 +1,10 @@
+import * as dotenv from 'dotenv';
+import * as path from 'path';
+
+// Force load env for standalone execution
+const envPath = path.join(__dirname, '../../.env');
+dotenv.config({ path: envPath });
+
 import pool from './db';
 
 export const syncDatabaseSchema = async () => {
@@ -74,6 +81,10 @@ export const syncDatabaseSchema = async () => {
         await addColumnIfNotExists('users', 'total_earnings', 'INT DEFAULT 0');
         await addColumnIfNotExists('users', 'current_win_streak', 'INT DEFAULT 0');
         await addColumnIfNotExists('users', 'longest_win_streak', 'INT DEFAULT 0');
+
+        // New column for player_answers to persist stats even if questions are deleted
+        await addColumnIfNotExists('player_answers', 'category', 'VARCHAR(50)');
+
 
         // 4. Ensure 'players' table exists
         await client.query(`

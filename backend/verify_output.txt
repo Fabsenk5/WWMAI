@@ -1,0 +1,2 @@
+--- VERIFICATION START ---
+Verification Failed: malformed array literal: "["B","C","D"]"

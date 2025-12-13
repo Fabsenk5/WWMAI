@@ -357,14 +357,9 @@ export class QuestionModel {
         try {
             await client.query('BEGIN');
 
-            // 1. Delete dependent player_answers first
-            const cleanupQuery = `
-                DELETE FROM player_answers 
-                WHERE question_id IN (
-                    SELECT id FROM questions WHERE category = ANY($1)
-                )
-            `;
-            await client.query(cleanupQuery, [categories]);
+            // 1. Delete dependent player_answers first (DISABLED: Persist Stats)
+            // const cleanupQuery = ` Delete query was here `;
+            // await client.query(cleanupQuery, [categories]);
 
             // 2. Dereference from games table (set current_question_id to NULL)
             const dereferenceQuery = `
@@ -457,8 +452,8 @@ export class QuestionModel {
         try {
             await client.query('BEGIN');
 
-            // 1. Delete dependent player_answers
-            await client.query('DELETE FROM player_answers WHERE question_id = $1', [id]);
+            // 1. Delete dependent player_answers (DISABLED: Persist Stats)
+            // await client.query('DELETE FROM player_answers WHERE question_id = $1', [id]);
 
             // 2. Dereference from games table
             await client.query('UPDATE games SET current_question_id = NULL WHERE current_question_id = $1', [id]);
