@@ -56,20 +56,51 @@ export class AiService {
                 return;
             }
 
-            // 2. Determine amount to generate (Cap at 20 to strictly limit load per request)
+            // 2. Fetch existing questions from this category for duplicate prevention
+            const existingQuestionsQuery = `
+                SELECT question, correct_answer, difficulty 
+                FROM questions 
+                WHERE category = $1 AND is_active = true
+                ORDER BY created_at DESC
+                LIMIT 100
+            `;
+            const existingQuestionsResult = await this.db.query(existingQuestionsQuery, [category]);
+            const existingQuestions = existingQuestionsResult.rows;
+            console.log(`[AiService] Loaded ${existingQuestions.length} existing questions from "${category}" as reference.`);
+
+            // 3. Determine amount to generate (Cap at 20 to strictly limit load per request)
             const amountToGenerate = Math.min(gap, 20);
             console.log(`[AiService] 🤖 Starting background generation for "${category}". Target: ${amountToGenerate} new questions.`);
 
-            // 3. Calculate difficulty distribution dynamically
+            // 4. Calculate difficulty distribution dynamically
             const easyCount = Math.ceil(amountToGenerate * 0.25);
             const mediumCount = Math.ceil(amountToGenerate * 0.35);
             const hardCount = Math.ceil(amountToGenerate * 0.25);
             const veryHardCount = Math.max(0, amountToGenerate - (easyCount + mediumCount + hardCount));
 
+            // 5. Format existing questions for the prompt
+            const existingQuestionsText = existingQuestions.length > 0
+                ? `
+
+EXISTING QUESTIONS IN "${category}" CATEGORY (DO NOT DUPLICATE OR CREATE SIMILAR QUESTIONS):
+${existingQuestions.map((q, i) =>
+                    `${i + 1}. [${q.difficulty.toUpperCase()}] ${q.question} (Answer: ${q.correct_answer})`
+                ).join('\n')}
+
+**CRITICAL INSTRUCTION**: Review the above ${existingQuestions.length} existing questions carefully. Your new questions MUST:
+- Cover completely different topics/subjects within "${category}"
+- Use different question phrasing and structure
+- NOT be semantically similar (e.g., if there's a question about Paris, don't ask about other French cities unless truly distinct)
+- Explore unexplored sub-topics within "${category}"
+- Bring fresh perspectives and angles to the category
+`
+                : '';
+
             const prompt = `
                 Generate ${amountToGenerate} unique trivia questions for the category "${category}".
                 
                 PROMPT VARIATION SEED: ${Date.now()} (Use this to randomize your output focus)
+                ${existingQuestionsText}
 
                 CRITICAL CULTURAL INSTRUCTION:
                 Prioritize questions with **International** relevance first, then **European** relevance, then **German** relevance.
@@ -121,25 +152,52 @@ export class AiService {
 
             let result;
             // Priority: Newest/Best -> Standard Flash -> Lite Fallback
+            // With retry logic for the main model
             const models = ["gemini-3-pro-preview", "gemini-2.5-flash-preview-09-2025", "gemini-2.5-flash-lite-preview-09-2025"];
+            const maxRetriesForMainModel = 1; // Retry the main model once before fallback
 
-            for (const modelName of models) {
-                try {
-                    const model = this.genAI.getGenerativeModel({ model: modelName });
-                    result = await model.generateContent(prompt);
-                    break; // Success, exit loop
-                } catch (err: any) {
-                    const isLast = modelName === models[models.length - 1];
-                    const isOverloaded = err.message && (err.message.includes('503') || err.message.includes('Service Unavailable') || err.message.includes('overloaded'));
+            for (let modelIndex = 0; modelIndex < models.length; modelIndex++) {
+                const modelName = models[modelIndex];
+                const isMainModel = modelIndex === 0;
+                const isLast = modelIndex === models.length - 1;
+                const retriesToAttempt = isMainModel ? maxRetriesForMainModel + 1 : 1; // Main model gets retry
 
-                    if (isOverloaded) {
-                        console.warn(`[AiService] ⚠️ Model "${modelName}" overloaded (503). ${isLast ? 'All models failed.' : 'Switching to next model...'}`);
-                    } else {
-                        console.warn(`[AiService] ⚠️ Model "${modelName}" failed: ${err.message}. ${isLast ? 'All models failed.' : 'Switching to next model...'}`);
+                for (let attempt = 0; attempt < retriesToAttempt; attempt++) {
+                    try {
+                        const model = this.genAI.getGenerativeModel({
+                            model: modelName,
+                            generationConfig: {
+                                temperature: 0.9, // High creativity while following constraints
+                                topP: 0.95,
+                            }
+                        });
+                        result = await model.generateContent(prompt);
+                        console.log(`[AiService] ✅ Successfully generated questions using "${modelName}"${attempt > 0 ? ` (retry ${attempt})` : ''}`);
+                        break; // Success, exit retry loop
+                    } catch (err: any) {
+                        const isLastAttempt = attempt === retriesToAttempt - 1;
+                        const isOverloaded = err.message && (err.message.includes('503') || err.message.includes('Service Unavailable') || err.message.includes('overloaded'));
+
+                        if (isOverloaded) {
+                            console.warn(`[AiService] ⚠️ Model "${modelName}" overloaded (503)${attempt > 0 ? ` (retry ${attempt})` : ''}. ${isLastAttempt ? (isLast ? 'All models failed.' : 'Switching to next model...') : 'Retrying...'}`);
+                        } else {
+                            console.warn(`[AiService] ⚠️ Model "${modelName}" failed: ${err.message}${attempt > 0 ? ` (retry ${attempt})` : ''}. ${isLastAttempt ? (isLast ? 'All models failed.' : 'Switching to next model...') : 'Retrying...'}`);
+                        }
+
+                        if (isLastAttempt && isLast) {
+                            throw err; // Throw the final error if we ran out of all models and retries
+                        }
+
+                        if (isLastAttempt) {
+                            break; // Exit retry loop, move to next model
+                        }
+
+                        // Wait a bit before retrying
+                        await new Promise(resolve => setTimeout(resolve, 1000));
                     }
-
-                    if (isLast) throw err; // Throw the final error if we ran out of models
                 }
+
+                if (result) break; // Successfully got result, exit model loop
             }
 
             if (!result) {
