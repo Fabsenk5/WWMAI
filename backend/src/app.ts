@@ -62,10 +62,30 @@ connectWithRetry().then(async () => {
     try {
         await syncDatabaseSchema();
         checkAndSeedDatabase();
+
+        // Initial keep-alive check after DB is ready
+        performKeepAlive();
     } catch (err) {
         console.error('Failed to sync schema on startup:', err);
     }
 });
+
+// Keep-alive mechanism to prevent DB sleep (and keep Render backend active)
+const performKeepAlive = async () => {
+    try {
+        console.log(`[${new Date().toISOString()}] Performing DB keep-alive check...`);
+        // Simple ping to keep connection alive
+        await pool.query('SELECT 1');
+        console.log(`[${new Date().toISOString()}] DB keep-alive check successful`);
+    } catch (error) {
+        console.error(`[${new Date().toISOString()}] DB keep-alive check failed:`, error);
+    }
+};
+
+// Run every 14 minutes (keeps Render awake, but allows Neon to conserve compute)
+const KEEP_ALIVE_INTERVAL = 14 * 60 * 1000;
+setInterval(performKeepAlive, KEEP_ALIVE_INTERVAL);
+console.log('[App] Database keep-alive scheduled every 14 minutes.');
 
 const server = createServer(app);
 
@@ -79,6 +99,29 @@ setRoutes(app);
 app.use('/api/admin', createAdminRouter(pool));
 app.use('/api/auth', authRoutes);
 app.use('/api/feature-wishes', featureWishlistRoutes);
+
+// Enhanced health endpoint with DB validation
+app.get('/health', async (req, res) => {
+    const startTime = Date.now();
+    let dbAlive = false;
+
+    try {
+        const result = await pool.query('SELECT 1 as alive');
+        dbAlive = result.rows[0]?.alive === 1;
+    } catch (error) {
+        console.error('[Health] Database ping failed:', error);
+    }
+
+    const responseTime = Date.now() - startTime;
+
+    res.json({
+        status: 'ok',
+        database: dbAlive ? 'connected' : 'error',
+        uptime: process.uptime(),
+        responseTime: `${responseTime}ms`,
+        timestamp: new Date().toISOString()
+    });
+});
 
 setInterval(() => {
     cleanupInactiveRooms().catch(err => {

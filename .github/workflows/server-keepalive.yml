@@ -1,0 +1,54 @@
+name: Server Keep-Alive
+
+# Prevent Render backend from spinning down (15 min inactivity limit)
+# and keep Neon database warm (5 min inactivity limit)
+
+on:
+  schedule:
+    # Every 10 minutes during daytime (8am-10pm CET)
+    - cron: '*/10 8-22 * * *'
+    # Every 30 minutes during night (10pm-8am CET)
+    - cron: '*/30 0-7,23 * * *'
+  
+  # Allow manual trigger
+  workflow_dispatch:
+
+jobs:
+  ping-server:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Ping backend health endpoint
+        run: |
+          echo "Pinging server at $(date)"
+          
+          # Get the backend URL from repository secret or use default
+          BACKEND_URL="${{ secrets.BACKEND_URL || 'https://wer-wird-millionar-mp.onrender.com' }}"
+          
+          # Ping the health endpoint
+          response=$(curl -s -o /dev/null -w "%{http_code}" "$BACKEND_URL/health")
+          
+          if [ $response -eq 200 ]; then
+            echo "✅ Server is awake (HTTP $response)"
+          else
+            echo "⚠️ Server returned HTTP $response"
+            exit 1
+          fi
+      
+      - name: Validate database connection
+        run: |
+          BACKEND_URL="${{ secrets.BACKEND_URL || 'https://wer-wird-millionar-mp.onrender.com' }}"
+          
+          # Get detailed health info
+          health_data=$(curl -s "$BACKEND_URL/health")
+          echo "Health check response: $health_data"
+          
+          # Parse database status
+          db_status=$(echo $health_data | jq -r '.database')
+          
+          if [ "$db_status" = "connected" ]; then
+            echo "✅ Database is connected"
+          else
+            echo "❌ Database connection failed"
+            exit 1
+          fi

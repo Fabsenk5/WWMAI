@@ -13,7 +13,23 @@ if (process.env.DATABASE_URL) {
     // Production / Render Environment
     poolConfig = {
         connectionString: process.env.DATABASE_URL,
-        ssl: { rejectUnauthorized: false }
+        ssl: { rejectUnauthorized: false },
+
+        // Pool size optimization for free tier
+        max: 5,  // Maximum 5 connections
+        min: 1,  // Keep at least 1 connection warm
+
+        // Timeout settings to handle cold starts
+        connectionTimeoutMillis: 30000,  // 30s to allow for cold start
+        idleTimeoutMillis: 30000,  // Close idle connections after 30s
+
+        // Keep-alive to prevent connection drops
+        keepAlive: true,
+        keepAliveInitialDelayMillis: 10000,  // Start keep-alive after 10s
+
+        // Query timeouts
+        statement_timeout: 30000,  // 30s query timeout
+        query_timeout: 30000,
     };
     console.log('Using DATABASE_URL for connection.');
 } else {
