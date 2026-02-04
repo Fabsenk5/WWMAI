@@ -353,7 +353,7 @@ const LobbyPage: React.FC = () => {
       if (socket.connected) socket.disconnect();
       socketRef.current = null;
     };
-  }, [roomCode, setGameDataFromContext, navigate, getAudioForLevel, playSFX, playTrack, stopAll, showAlert]);
+  }, [roomCode, setGameDataFromContext, navigate, getAudioForLevel, playSFX, playTrack, stopAll, showAlert, isLoading, user]);
 
   const handleUseJoker = async (jokerType: string) => {
     if (!roomCode || !currentQuestion) return;
