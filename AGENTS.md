@@ -1,0 +1,98 @@
+# AGENTS.md
+
+Monorepo for **WWMAI** ("Wer wird Millionär AI") — a multiplayer "Who Wants to Be a Millionaire" trivia game with real-time WebSocket gameplay, JWT auth, AI question generation (Gemini), Stripe premium, and i18n (en/de/ru/es). Live demo is a hobby project on Render/Neon; keep free-tier constraints in mind (see "Infrastructure").
+
+## Tech stack
+
+- **Backend**: Node + Express 4, TypeScript 5 (strict), `pg` (PostgreSQL), Socket.IO 4, JWT + bcrypt, Stripe, `@google/generative-ai`.
+- **Frontend**: React 19 via **Create React App** (`react-scripts`), TypeScript 4.9, react-router-dom 6, react-i18next, lucide-react, Socket.IO client, axios.
+- **Tests**: Jest + ts-jest + supertest (root config), **no lint setup**.
+
+## Commands
+
+```bash
+npm test                        # root: jest, runs backend/tests only
+cd backend && npm run dev       # ts-node-dev + dotenv, port 5000
+cd backend && npm run build     # tsc -> dist/
+cd backend && npm start         # node dist/src/app.js
+cd backend && npm run seed      # seed questions if empty (auto-seeds on boot too)
+cd frontend && npm start        # CRA dev server, port 3000, proxies /api to :5000
+cd frontend && npm run build    # react-scripts build
+docker-compose up               # backend + frontend + postgres:13 + cleanup service
+```
+
+- Always start the backend first; it **auto-creates/syncs the DB schema on boot** (`syncDatabaseSchema` in `backend/src/database/sync_schema.ts`).
+- DB reset: run `schema.sql` (destructive, drops all) then re-seed.
+
+## Repo layout (key paths)
+
+```
+backend/src/
+  app.ts                 # entry; mounts routes, socket joinRoom handler, keep-alive, room cleanup
+  socketSetup.ts         # exports io; initializeSocket(server)
+  controllers/           # gameController (huge: game flow + jokers), admin, Auth, Billing, FeatureWishlist
+  routes/                # gameRoutes (setRoutes factory), adminRoutes (factory), auth/billing/featureWishlist
+  middleware/authMiddleware.ts  # authenticateToken, optionalAuthenticateToken (Bearer JWT)
+  models/questionModel.ts       # question queries + difficulty/prize mapping
+  services/aiService.ts  # Gemini question gen, translation backfill
+  database/              # db.ts (Pool), seed.ts, sync_schema.ts, cleanupRooms.ts, run_migrations.ts, migrations/*.sql, schema.sql (stale base)
+backend/tests/           # questionModel, gameController, integration (uses REAL db; one broken import)
+frontend/src/
+  App.tsx                # routes + shell (UserIcon/Branding/ThemeToggle/LanguageSwitcher/AudioPlayer)
+  pages/                 # LobbyPage (main gameplay UI + jokers), GamePage, AdminDashboard, etc.
+  context/               # Auth, Audio, Game, Language, Modal, Theme
+  hooks/useGame.ts, config/api.ts, services/adminService.ts, locales/{en,de,ru,es}.json
+```
+
+## Architecture & key flows
+
+### API + socket
+- REST under `/api/games`, `/api/auth`, `/api/admin`, `/api/billing`, `/api/feature-wishes`; health at `/health` (DB ping). Rate limits on `/api` (300/15min) and game creation (10/hour/IP).
+- Socket.IO events: server emits `gameStarted`, `newQuestion`, `playerAnswered`, `revealAnswers`, `gameEnded`, `jokerUsed`, `playerKicked`, `gamePaused`, `userJoined`; client emits `joinRoom`. The joinRoom socket handler lives in `app.ts`.
+- Question payload shape (over the wire): `{ id, category, difficulty, question, questionTranslations, level, prize, options:[{text, translations}] }`. Options are deterministically shuffled per question ID (`getConsistentOptions`).
+
+### Game flow
+- Create → `POST /api/games/create` (room code = 6-char uppercase alnum). Join → `POST /api/games/join` (generates guest userId, auto-starts when room fills). Answer → `POST /api/games/:roomCode/submit-answer` (aliased by `/answer`).
+- **15 levels**, prize ladder in `getPrizeForLevel` (`gameController.ts`): `[50,100,200,300,500,1000,2000,4000,8000,16000,32000,64000,125000,500000,1000000]`.
+- Difficulty per level (standard): L1-4 easy, L5-9 medium, L10-13 hard, L14-15 very_hard. Modes: `standard|easy|hard|mixed` (see `questionModel.getQuestionByLevel`; has adjacent-difficulty fallback chain).
+- **Game modes**: `cooperative` (team votes, majority answer decides, shared lives; wrong answer −1 life) and `survival` (per-player lives, individual score; eliminated players spectate).
+- Round resolution emits `revealAnswers`, then advances after `wait_time` (default 15s). `gameEnded` is emitted 30s+wait later. Stats finalized in `finalizeGameStats` (registered users only; guests skipped).
+- **Jokers** (`POST /api/games/:roomCode/joker`): `5050` (2 wrong removed), `audience` (simulated % stats, reliability scales down with difficulty), `phone` (heuristic friend). Co-op = team-scoped (games.jokers_used); survival = per-player (players.jokers_used).
+
+### AI question generation
+- `AiService.ensureCategoryPool(category, threshold)` is fired in background on game creation if pool is low; capped at 20 questions/request, difficulty split ~25/35/25/15%. Models: `gemini-3-pro-preview` → `gemini-2.5-flash-preview-09-2025` → `gemini-2.5-flash-lite-preview-09-2025` with 503-retry/fallback. Disabled without `GEMINI_API_KEY`.
+- Questions carry `translations` JSONB `{de,ru,es:{question,correct_answer,incorrect_answers}}`.
+
+### Auth / premium
+- JWT payload `{userId, username, role: subscription_status}`, 24h expiry. `optionalAuthenticateToken` allows guest game creation.
+- Premium gates (co-op kick, moderator mode, custom categories, non-standard difficulty) are checked **fresh from DB** in `createGame`, plus global flags in `system_settings` (`global_premium_unlocked`, `global_guest_premium_unlocked` — togglable via admin).
+- Admin routes use a plain `ADMIN_PASSWORD` env (default `admin`) passed per-request — no JWT. Billing webhook must stay mounted before `express.json()` (raw body) in `app.ts`.
+
+### i18n
+- UI chrome strings: `frontend/src/locales/*.json` (flat, ~55 keys, via react-i18next, fallback en). Game content translations come from the DB question `translations`, selected by `LanguageContext.language`.
+
+## Conventions & rules
+
+- **Git**: after any change is implemented and validated, **push it** (`git add . && git commit -m "<msg>" && git push`) — this is a standing repo rule (`.agent/rules/`). Keep commit messages lowercase-prefixed like `docs:`, `fix:`, `feat:`.
+- TypeScript strict on both sides. Do not add code comments unless needed for intent.
+- DB access: import the shared `pool` from `backend/src/database/db` (singleton). Parameterize all queries ($1…).
+- Schema evolution: prefer adding to `sync_schema.ts` (idempotent `CREATE TABLE IF NOT EXISTS` / `addColumnIfNotExists`, runs on boot) OR add a file in `database/migrations/` and run `run_migrations.ts`. Keep `schema.sql` in sync only for fresh installs — it is currently stale.
+- Backend code style: 4-space indent, single quotes, explicit `console.log` diagnostics everywhere (mimic existing).
+- Frontend: CRA, CSS files alongside components/pages, CSS variables + `data-theme` for light/dark in `App.css`.
+
+## Gotchas (read before editing)
+
+- `integration.test.ts` imports `../src/database/database/seed` (double `database`) — likely broken; keep tests green with `npm test` from root (backend tests mock `pg`; integration needs a live DB).
+- `backend/package.json` `test` script references a missing `jest.config.js` — use root `npm test`.
+- `schema.sql` uses old `games.id`/`questions.question_id` naming; current code/DB use `games.game_id`/`questions.id`. Don't trust schema.sql for column names.
+- Docs (`DEVELOPER_GUIDE.md`, `README.md`) reference scripts/behaviors that no longer exist (`resetAndApplySchema.ts`, `npm run seed-db`, `reset-db`) — treat them as illustrative.
+- Backend root contains leftover dev scripts (`change_password.ts`, `check_cars.ts`, `list_models.ts`, `migrate_*.ts`, `sim_fetch.ts`, `*.txt` outputs) — not part of the app; do not import them. `debug_output.txt` contains real user data — do not commit.
+- Frontend has `src_backup/` — don't edit it.
+
+## Environment
+
+`backend/.env` (see `.env.example`): `DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME`, `GEMINI_API_KEY`, plus `JWT_SECRET`, `DATABASE_URL` (prod, SSL), `CLIENT_URL`, `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID`, `STRIPE_WEBHOOK_SECRET`, `ADMIN_PASSWORD`, `PORT`. Root `.env` also used.
+
+## Infrastructure
+
+- Render hosts backend/frontend; Neon PostgreSQL (free tier → small pool `max:5`, 30s timeouts, keep-alive). `app.ts` pings DB every 14 min; GitHub Actions (`keep-alive.yml`, `server-keepalive.yml`) curl `/health` so the free instance doesn't cold-sleep. Room cleanup runs every 5 min (`cleanupInactiveRooms`).
