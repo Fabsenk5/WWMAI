@@ -77,6 +77,7 @@ const LobbyPage: React.FC = () => {
   // REMOVED early return here to avoid conditional hook execution error
 
   const socketRef = useRef<Socket | null>(null);
+  const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const setGameDataFromContext = setGameData!;
 
@@ -263,15 +264,22 @@ const LobbyPage: React.FC = () => {
         setGameResult(result);
       }
 
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+      }
       const countdownInterval = setInterval(() => {
         setCountdown(prevTime => {
           if (prevTime === null || prevTime <= 1) {
-            clearInterval(countdownInterval);
+            if (countdownIntervalRef.current) {
+              clearInterval(countdownIntervalRef.current);
+              countdownIntervalRef.current = null;
+            }
             return 0;
           }
           return prevTime - 1;
         });
       }, 1000);
+      countdownIntervalRef.current = countdownInterval;
 
       if (roomCode) {
         fetch(`${API_BASE_URL}/api/games/${roomCode}/players`)
@@ -279,7 +287,6 @@ const LobbyPage: React.FC = () => {
           .then(updatedPlayers => setPlayers(updatedPlayers))
           .catch(console.error);
       }
-      return () => clearInterval(countdownInterval);
     };
 
     const handleGameEnded = (data: { message: string }) => {
@@ -323,7 +330,6 @@ const LobbyPage: React.FC = () => {
     socket.on('revealAnswers', handleRevealAnswers);
     socket.on('gameEnded', handleGameEnded);
     socket.on('userJoined', handleUserJoined);
-    socket.on('userJoined', handleUserJoined);
     socket.on('jokerUsed', handleJokerUsed);
 
     socket.on('playerKicked', (data: { userId: string, name: string }) => {
@@ -353,6 +359,10 @@ const LobbyPage: React.FC = () => {
       socket.off('jokerUsed', handleJokerUsed);
       if (socket.connected) socket.disconnect();
       socketRef.current = null;
+      if (countdownIntervalRef.current) {
+        clearInterval(countdownIntervalRef.current);
+        countdownIntervalRef.current = null;
+      }
     };
   }, [roomCode, setGameDataFromContext, navigate, getAudioForLevel, playSFX, playTrack, stopAll, showAlert, isLoading, user]);
 
