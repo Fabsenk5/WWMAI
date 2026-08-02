@@ -28,6 +28,42 @@ export const syncDatabaseSchema = async () => {
         `);
         console.log('[Schema Sync] Verified users table.');
 
+        // 1b. Ensure 'questions' table exists (MISSING before: fresh installs broke)
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS questions (
+                id SERIAL PRIMARY KEY,
+                category VARCHAR(255),
+                difficulty VARCHAR(50),
+                question TEXT,
+                correct_answer TEXT,
+                incorrect_answers TEXT[],
+                translations JSONB DEFAULT '{}',
+                is_active BOOLEAN DEFAULT TRUE,
+                created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+                CONSTRAINT unique_question UNIQUE (category, question, difficulty)
+            );
+        `);
+        console.log('[Schema Sync] Verified questions table.');
+
+        await addColumnIfNotExists('questions', 'translations', "JSONB DEFAULT '{}'");
+        await addColumnIfNotExists('questions', 'is_active', 'BOOLEAN DEFAULT TRUE');
+
+        // 1c. Ensure 'rooms' + 'game_questions' tables exist (required by seed.ts)
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS rooms (
+                id SERIAL PRIMARY KEY,
+                last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            );
+        `);
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS game_questions (
+                game_id INT REFERENCES games(game_id) ON DELETE CASCADE,
+                question_id INT REFERENCES questions(id) ON DELETE CASCADE,
+                PRIMARY KEY (game_id, question_id)
+            );
+        `);
+        console.log('[Schema Sync] Verified rooms + game_questions tables.');
+
         // 2. Ensure 'games' table exists
         await client.query(`
             CREATE TABLE IF NOT EXISTS games (
@@ -70,6 +106,7 @@ export const syncDatabaseSchema = async () => {
         await addColumnIfNotExists('games', 'lives', 'INT DEFAULT 3');
         await addColumnIfNotExists('games', 'wait_time', 'INT DEFAULT 15');
         await addColumnIfNotExists('games', 'moderator_mode', 'BOOLEAN DEFAULT FALSE');
+        await addColumnIfNotExists('games', 'jokers_used', "TEXT[] DEFAULT '{}'");
 
         // Add missing columns for 'users'
         await addColumnIfNotExists('users', 'avatar_url', 'VARCHAR(255)');
@@ -100,6 +137,9 @@ export const syncDatabaseSchema = async () => {
             );
         `);
         console.log('[Schema Sync] Verified players table.');
+
+        await addColumnIfNotExists('players', 'jokers_used', "TEXT[] DEFAULT '{}'");
+        await addColumnIfNotExists('players', 'game_id', 'INT');
 
         // 5. Ensure 'player_answers' table exists
         await client.query(`

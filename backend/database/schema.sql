@@ -1,39 +1,89 @@
+-- Full reset schema for WWMAI (destructive). Kept in sync with
+-- backend/src/database/sync_schema.ts (the boot-time source of truth).
+
+DROP TABLE IF EXISTS game_questions CASCADE;
+DROP TABLE IF EXISTS player_answers CASCADE;
+DROP TABLE IF EXISTS feature_wishes CASCADE;
+DROP TABLE IF EXISTS system_settings CASCADE;
+DROP TABLE IF EXISTS rooms CASCADE;
+DROP TABLE IF EXISTS players CASCADE;
+DROP TABLE IF EXISTS games CASCADE;
+DROP TABLE IF EXISTS questions CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
+
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    username VARCHAR(50) UNIQUE NOT NULL,
+    email VARCHAR(100) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    subscription_status VARCHAR(20) DEFAULT 'free',
+    subscription_end_date TIMESTAMP WITH TIME ZONE,
+    stripe_customer_id VARCHAR(255),
+    avatar_url VARCHAR(255),
+    games_played INT DEFAULT 0,
+    games_won INT DEFAULT 0,
+    total_earnings INT DEFAULT 0,
+    current_win_streak INT DEFAULT 0,
+    longest_win_streak INT DEFAULT 0
+);
+
 CREATE TABLE questions (
     id SERIAL PRIMARY KEY,
-    category VARCHAR(255) NOT NULL,
-    difficulty VARCHAR(50) NOT NULL,
-    question TEXT NOT NULL,
-    correct_answer TEXT NOT NULL,
-    incorrect_answers TEXT[] NOT NULL,
-    translations JSONB DEFAULT '{}', -- Store translations for the question
-    CONSTRAINT unique_question UNIQUE (category, question, difficulty) -- Add a unique constraint to prevent duplicate questions
+    category VARCHAR(255),
+    difficulty VARCHAR(50),
+    question TEXT,
+    correct_answer TEXT,
+    incorrect_answers TEXT[],
+    translations JSONB DEFAULT '{}',
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT unique_question UNIQUE (category, question, difficulty)
 );
 
 CREATE TABLE games (
     game_id SERIAL PRIMARY KEY,
+    room_code VARCHAR(10) UNIQUE NOT NULL,
     name VARCHAR(255) NOT NULL,
-    player_count INT NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    room_code VARCHAR(10) UNIQUE,
-    status VARCHAR(50) DEFAULT 'pending', -- pending, started, ended
-    current_level INT DEFAULT 1, -- Track current level, start at 1
-    current_question_id INT REFERENCES questions(id), -- Track the current question
-    last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    user_count INTEGER NOT NULL DEFAULT 0, -- Add user_count column to the games table
-    lives INT DEFAULT 3, -- Team shared lives
-    jokers_used TEXT[] DEFAULT '{}', -- Track used jokers
-    game_mode VARCHAR(20) DEFAULT 'cooperative', -- 'cooperative' or 'survival'
-    selected_categories TEXT[] -- Categories selected for the game
+    host_id INT REFERENCES users(id),
+    status VARCHAR(20) DEFAULT 'pending',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    current_level INT DEFAULT 0,
+    current_question_id INT REFERENCES questions(id),
+    selected_categories TEXT[],
+    player_count INT DEFAULT 10,
+    game_mode VARCHAR(20) DEFAULT 'cooperative',
+    lives INT DEFAULT 3,
+    wait_time INT DEFAULT 15,
+    difficulty_mode VARCHAR(20) DEFAULT 'standard',
+    moderator_mode BOOLEAN DEFAULT FALSE,
+    jokers_used TEXT[] DEFAULT '{}',
+    last_active TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE players (
-    userId VARCHAR(50) PRIMARY KEY, -- Renamed from playerId to userId
-    room_code VARCHAR(10) NOT NULL,
-    name VARCHAR(255) NOT NULL,
-    lives INT DEFAULT 3,
+    id SERIAL PRIMARY KEY,
+    userId VARCHAR(50),
+    room_code VARCHAR(10) REFERENCES games(room_code),
+    name VARCHAR(50),
     score INT DEFAULT 0,
-    jokers_used TEXT[] DEFAULT '{}', -- Track used jokers for survival mode
-    CONSTRAINT unique_player_name_per_room UNIQUE (room_code, name) -- Add a unique constraint to prevent duplicate player names in the same room
+    lives INT DEFAULT 3,
+    jokers_used TEXT[] DEFAULT '{}',
+    game_id INT,
+    joined_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE (userId, room_code)
+);
+
+CREATE TABLE player_answers (
+    id SERIAL PRIMARY KEY,
+    user_id VARCHAR(50),
+    question_id INT,
+    answer VARCHAR(255),
+    is_correct BOOLEAN,
+    room_code VARCHAR(10),
+    level INT,
+    category VARCHAR(50),
+    answered_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
 CREATE TABLE game_questions (
@@ -42,29 +92,25 @@ CREATE TABLE game_questions (
     PRIMARY KEY (game_id, question_id)
 );
 
-CREATE TABLE player_answers (
-    id SERIAL PRIMARY KEY,
-    user_id VARCHAR(50) REFERENCES players(userId) ON DELETE CASCADE, -- Updated to reference userId
-    question_id INT REFERENCES questions(id) ON DELETE CASCADE,
-    answer TEXT,
-    is_correct BOOLEAN,
-    answered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    room_code VARCHAR(10) REFERENCES games(room_code) ON DELETE CASCADE, -- Added room_code
-    level INT,                                                          -- Added level
-    CONSTRAINT unique_player_question_level_room UNIQUE (user_id, question_id, level, room_code) -- Updated constraint
-);
-
--- Table to store fixed questions for game rooms
-CREATE TABLE game_fixed_questions (
-    room_code VARCHAR(10) PRIMARY KEY,
-    fixed_question_id INTEGER NOT NULL,
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);
-
--- Add an index for faster lookups
-CREATE INDEX idx_game_fixed_questions_room_code ON game_fixed_questions(room_code);
-
 CREATE TABLE rooms (
     id SERIAL PRIMARY KEY,
     last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE system_settings (
+    key VARCHAR(50) PRIMARY KEY,
+    value VARCHAR(255)
+);
+
+INSERT INTO system_settings (key, value) VALUES
+    ('global_premium_unlocked', 'false'),
+    ('global_guest_premium_unlocked', 'false')
+ON CONFLICT (key) DO NOTHING;
+
+CREATE TABLE feature_wishes (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    title TEXT NOT NULL,
+    status VARCHAR(50) DEFAULT 'pending',
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    created_by_email VARCHAR(255)
 );

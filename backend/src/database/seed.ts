@@ -136,8 +136,8 @@ async function seedGames() {
     const gameId = gameResult.rows[0].game_id;
 
     // Update references to `id` with the new identifiers like `question_id` and `game_id`
-    const questionIdsResult = await pool.query('SELECT question_id FROM questions LIMIT 15');
-    const questionIds = questionIdsResult.rows.map(row => row.question_id);
+    const questionIdsResult = await pool.query('SELECT id FROM questions LIMIT 15');
+    const questionIds = questionIdsResult.rows.map(row => row.id);
 
     for (const questionId of questionIds) {
         const gameQuestionQuery = `
