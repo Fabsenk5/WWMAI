@@ -32,6 +32,8 @@ export class AiService {
     private baseURL: string;
     private modelCandidates: string[];
     private db: Pool;
+    private generationLocks: Map<string, boolean> = new Map(); // per-category in-flight guard
+    private static readonly COOLDOWN_HOURS = 6; // min hours between generations per category
 
     constructor(dbPool: Pool) {
         this.db = dbPool;
@@ -125,6 +127,21 @@ export class AiService {
             return;
         }
 
+        // Concurrency guard: only one generation per category at a time
+        if (this.generationLocks.get(category)) {
+            console.log(`[AiService] Generation for "${category}" already in progress. Skipping duplicate run.`);
+            return;
+        }
+        this.generationLocks.set(category, true);
+        try {
+            await this.runCategoryGeneration(category, threshold);
+        } finally {
+            this.generationLocks.set(category, false);
+            console.log(`[AiService] Released generation lock for "${category}".`);
+        }
+    }
+
+    private async runCategoryGeneration(category: string, threshold: number = 50): Promise<void> {
         try {
             // 1. Check current count
             const countQuery = `SELECT COUNT(*) FROM questions WHERE category = $1 AND is_active = true`;
@@ -140,29 +157,43 @@ export class AiService {
                 return;
             }
 
-            // 2. Fetch existing questions from this category for duplicate prevention
+            // 2. Cooldown per category: only generate if the pool is empty or the last
+            //    generated question is older than COOLDOWN_HOURS. Prevents repeated
+            //    similar-fill generations triggered by consecutive game creations.
+            const lastGenRes = await this.db.query(
+                `SELECT MAX(created_at) AS last FROM questions WHERE category = $1`,
+                [category]
+            );
+            const lastGenAt = lastGenRes.rows[0]?.last ? new Date(lastGenRes.rows[0].last) : null;
+            const cooldownMs = AiService.COOLDOWN_HOURS * 60 * 60 * 1000;
+            if (lastGenAt && (Date.now() - lastGenAt.getTime()) < cooldownMs) {
+                console.log(`[AiService] Category "${category}" was generated ${Math.round((Date.now() - lastGenAt.getTime()) / 60000)} min ago. Cooldown (${AiService.COOLDOWN_HOURS}h) active. Skipping.`);
+                return;
+            }
+
+            // 3. Fetch ALL existing active questions as reference (not just 100)
             const existingQuestionsQuery = `
                 SELECT question, correct_answer, difficulty 
                 FROM questions 
                 WHERE category = $1 AND is_active = true
                 ORDER BY created_at DESC
-                LIMIT 100
             `;
             const existingQuestionsResult = await this.db.query(existingQuestionsQuery, [category]);
             const existingQuestions = existingQuestionsResult.rows;
             console.log(`[AiService] Loaded ${existingQuestions.length} existing questions from "${category}" as reference.`);
 
-            // 3. Determine amount to generate (Cap at 20 to strictly limit load per request)
-            const amountToGenerate = Math.min(gap, 20);
+            // 4. Determine amount to generate (larger batches fill the pool faster and
+            //    reduce repeated near-identical generations)
+            const amountToGenerate = Math.min(gap, 50);
             console.log(`[AiService] 🤖 Starting background generation for "${category}". Target: ${amountToGenerate} new questions.`);
 
-            // 4. Calculate difficulty distribution dynamically
+            // 5. Calculate difficulty distribution dynamically
             const easyCount = Math.ceil(amountToGenerate * 0.25);
             const mediumCount = Math.ceil(amountToGenerate * 0.35);
             const hardCount = Math.ceil(amountToGenerate * 0.25);
             const veryHardCount = Math.max(0, amountToGenerate - (easyCount + mediumCount + hardCount));
 
-            // 5. Format existing questions for the prompt
+            // 6. Format existing questions for the prompt
             const existingQuestionsText = existingQuestions.length > 0
                 ? `
 
@@ -239,7 +270,7 @@ ${existingQuestions.map((q, i) =>
                     { role: 'system', content: 'You are a trivia question generator. You always respond with valid JSON only.' },
                     { role: 'user', content: prompt },
                 ],
-                { json: true, maxTokens: 12000 }
+                { json: true, maxTokens: Math.max(12000, amountToGenerate * 600) }
             );
 
             // Cleanup potential markdown code blocks
@@ -254,9 +285,23 @@ ${existingQuestions.map((q, i) =>
                 throw jsonError;
             }
 
-            console.log(`[AiService] Parsed ${questions.length} questions. Inserting into DB...`);
+            console.log(`[AiService] Parsed ${questions.length} questions. Checking duplicates + inserting...`);
+
+            // Load existing questions (with embeddings) once for the duplicate gate
+            const gateQuery = `
+                SELECT id, question, correct_answer, embedding
+                FROM questions
+                WHERE category = $1 AND is_active = true
+                ORDER BY created_at DESC
+                LIMIT 500
+            `;
+            const gateRes = await this.db.query(gateQuery, [category]);
+            const gateExisting = gateRes.rows;
 
             let insertedCount = 0;
+            let rejectedCount = 0;
+            const insertedThisSession = new Set<string>();
+
             // Insert into DB
             for (const q of questions) {
                 // Determine normalized difficulty string just in case
@@ -265,28 +310,62 @@ ${existingQuestions.map((q, i) =>
                     diff = 'medium'; // fallback
                 }
 
-                // Check for duplicates to avoid constraint errors
-                const checkQuery = `SELECT id FROM questions WHERE category = $1 AND question = $2 AND difficulty = $3`;
-                const checkRes = await this.db.query(checkQuery, [category, q.question, diff]);
+                const normQ = q.question.toLowerCase().trim().replace(/\s+/g, ' ');
 
-                if (checkRes.rows.length === 0) {
-                    const insertQuery = `
-                        INSERT INTO questions (category, difficulty, question, correct_answer, incorrect_answers, translations)
-                        VALUES ($1, $2, $3, $4, $5, $6)
-                    `;
-                    await this.db.query(insertQuery, [
-                        category,
-                        diff,
-                        q.question,
-                        q.correct_answer,
-                        q.incorrect_answers,
-                        JSON.stringify(q.translations)
-                    ]);
-                    insertedCount++;
+                // Intra-session exact check (normalized): the model sometimes
+                // emits the same question twice within one response
+                if (insertedThisSession.has(normQ)) {
+                    console.log(`[AiService] Rejected intra-batch duplicate: "${q.question}"`);
+                    rejectedCount++;
+                    continue;
                 }
+
+                // Check for exact duplicates (normalized) to avoid constraint errors
+                const checkQuery = `SELECT id FROM questions WHERE category = $1 AND LOWER(question) = LOWER($2)`;
+                const checkRes = await this.db.query(checkQuery, [category, q.question]);
+
+                if (checkRes.rows.length > 0) {
+                    console.log(`[AiService] Rejected exact duplicate: "${q.question}"`);
+                    rejectedCount++;
+                    continue;
+                }
+
+                // Embedding-based duplicate gate (falls back to no-op when the
+                // model is unavailable or no existing embeddings exist yet)
+                let embedding: number[] | null = null;
+                try {
+                    const { getQuestionEmbedding, computeDuplicateCheck } = await import('./embeddingService');
+                    embedding = await getQuestionEmbedding(q.question, q.correct_answer);
+                    const dup = computeDuplicateCheck(embedding, q.question, q.correct_answer, gateExisting);
+                    if (dup.duplicate) {
+                        console.log(`[AiService] Rejected similar question (sim=${dup.similarity?.toFixed(3)}): "${q.question}" ~ "${dup.similarTo}"`);
+                        rejectedCount++;
+                        continue;
+                    }
+                } catch (embedErr) {
+                    console.warn('[AiService] Embedding check unavailable, inserting without it:', embedErr);
+                }
+
+                const insertQuery = `
+                    INSERT INTO questions (category, difficulty, question, correct_answer, incorrect_answers, translations, embedding)
+                    VALUES ($1, $2, $3, $4, $5, $6, $7)
+                `;
+                await this.db.query(insertQuery, [
+                    category,
+                    diff,
+                    q.question,
+                    q.correct_answer,
+                    q.incorrect_answers,
+                    JSON.stringify(q.translations),
+                    embedding
+                ]);
+                insertedCount++;
+                insertedThisSession.add(normQ);
+                // Update the gate pool so intra-batch duplicates are caught too
+                gateExisting.push({ id: null, question: q.question, correct_answer: q.correct_answer, embedding });
             }
 
-            console.log(`[AiService] ✅ Successfully processed category: "${category}". New questions inserted: ${insertedCount}.`);
+            console.log(`[AiService] ✅ Successfully processed category: "${category}". New questions inserted: ${insertedCount}, rejected: ${rejectedCount}.`);
 
         } catch (error) {
             console.error(`[AiService] ❌ Error ensuring pool for category "${category}":`, error);

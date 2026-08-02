@@ -61,6 +61,7 @@ export const syncDatabaseSchema = async () => {
 
         await addColumnIfNotExists('questions', 'translations', "JSONB DEFAULT '{}'");
         await addColumnIfNotExists('questions', 'is_active', 'BOOLEAN DEFAULT TRUE');
+        await addColumnIfNotExists('questions', 'embedding', 'REAL[]');
 
         // 1c. Ensure 'rooms' table exists (required by seed.ts)
         await client.query(`

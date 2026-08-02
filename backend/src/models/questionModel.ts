@@ -65,7 +65,7 @@ export class QuestionModel {
      * @param excludeIds Optional array of question IDs to exclude
      * @returns A question object with normalized fields or null if no question is found
      */
-    async getQuestionByLevel(level: number, excludeIds: number[] = [], categories: string[] | null = null, difficultyMode: string = 'standard') {
+    async getQuestionByLevel(level: number, excludeIds: number[] = [], categories: string[] | null = null, difficultyMode: string = 'standard', usedEmbeddings: number[][] = []) {
         // Validate level
         if (level < 1 || level > 15) {
             console.error(`Invalid level specified: ${level}. Must be between 1 and 15.`);
@@ -94,7 +94,7 @@ export class QuestionModel {
 
             // 1. Try: Exact difficulty AND Selected Categories
             if (categories && categories.length > 0) {
-                question = await this.getRandomQuestionByDifficulty(difficulty, excludeIds, categories);
+                question = await this.getRandomQuestionByDifficulty(difficulty, excludeIds, categories, usedEmbeddings);
             }
 
             // 2. Fallback: Adjacent Difficulties (Smart Fallback)
@@ -122,10 +122,10 @@ export class QuestionModel {
 
                 for (const fbDiff of fallbackOrder) {
                     if (categories && categories.length > 0) {
-                        question = await this.getRandomQuestionByDifficulty(fbDiff, excludeIds, categories);
+                        question = await this.getRandomQuestionByDifficulty(fbDiff, excludeIds, categories, usedEmbeddings);
                     }
                     if (!question) {
-                        question = await this.getRandomQuestionByDifficulty(fbDiff, excludeIds, null);
+                        question = await this.getRandomQuestionByDifficulty(fbDiff, excludeIds, null, usedEmbeddings);
                     }
                     if (question) {
                         console.log(`[QuestionModel] Fallback successful: Found '${fbDiff}' question for level ${level} (Target: ${difficulty})`);
@@ -137,7 +137,7 @@ export class QuestionModel {
             // 3. Last Resort: Any random question (ignoring difficulty completely if above failed)
             if (!question) {
                 console.warn(`No questions found for difficulty hierarchy starting at: ${difficulty} (level ${level}). Falling back to purely random.`);
-                question = await this.getRandomQuestionByDifficulty(null, excludeIds, null);
+                question = await this.getRandomQuestionByDifficulty(null, excludeIds, null, usedEmbeddings);
             }
 
             // Final check: If still no question found, we have no questions available
@@ -161,7 +161,7 @@ export class QuestionModel {
      * @param limit Maximum number of questions to return
      * @returns Array of question objects or empty array if none found
      */
-    async getQuestionsByDifficulty(difficulty: string | null, excludeIds: number[] = [], limit: number = 5, categories: string[] | null = null) {
+    async getQuestionsByDifficulty(difficulty: string | null, excludeIds: number[] = [], limit: number = 5, categories: string[] | null = null, usedEmbeddings: number[][] = []) {
         try {
             let query = 'SELECT * FROM questions';
             const params: any[] = [];
@@ -194,15 +194,37 @@ export class QuestionModel {
                 query += ` WHERE ${conditions.join(' AND ')}`;
             }
 
-            // Complete the query with random ordering and limit
+            // Diversity: when the round already used questions (with embeddings),
+            // fetch extra candidates and spread them semantically in JS.
+            const useDiversity = usedEmbeddings.length > 0;
             query += ' ORDER BY RANDOM() LIMIT $' + paramIndex;
-            params.push(limit);
+            params.push(useDiversity ? Math.max(limit * 3, 30) : limit);
 
             // Execute the query
             const { rows } = await this.db.query(query, params);
 
             // Return normalized question objects
-            return rows.map(question => this.normalizeQuestionFields(question, 0));
+            const normalized = rows.map(question => this.normalizeQuestionFields(question, 0));
+
+            if (useDiversity && normalized.length > limit) {
+                try {
+                    const { cosineSimilarity } = await import('../services/embeddingService');
+                    const threshold = 0.85;
+                    const spreadQuestion = normalized.find((q: any) => {
+                        if (!q.embedding || q.embedding.length === 0) return true; // no embedding → can't judge → allow
+                        const maxSim = Math.max(...usedEmbeddings.map(ue => cosineSimilarity(q.embedding, ue)));
+                        return maxSim < threshold;
+                    });
+                    if (spreadQuestion) {
+                        return [spreadQuestion];
+                    }
+                    console.log(`[QuestionModel] No semantically distant question found for level; falling back to random pick.`);
+                } catch (embedErr) {
+                    console.warn('[QuestionModel] Diversity check unavailable:', embedErr);
+                }
+            }
+
+            return normalized;
         } catch (error) {
             console.error('Error in getQuestionsByDifficulty:', error);
             return [];
@@ -215,8 +237,8 @@ export class QuestionModel {
      * @param excludeIds Array of question IDs to exclude
      * @returns A question object or null if none found
      */
-    async getRandomQuestionByDifficulty(difficulty: string | null, excludeIds: number[] = [], categories: string[] | null = null) {
-        const questions = await this.getQuestionsByDifficulty(difficulty, excludeIds, 1, categories);
+    async getRandomQuestionByDifficulty(difficulty: string | null, excludeIds: number[] = [], categories: string[] | null = null, usedEmbeddings: number[][] = []) {
+        const questions = await this.getQuestionsByDifficulty(difficulty, excludeIds, 1, categories, usedEmbeddings);
         return questions.length > 0 ? questions[0] : null;
     }
 

@@ -117,6 +117,21 @@ export class GameController {
             const excludeIds = usedQuestionsResult.rows.map((row: any) => row.question_id);
             console.log(`[advanceToNextQuestion] Excluding IDs: ${excludeIds.join(', ')}`);
 
+            // Load embeddings of already-used questions so the next pick can be
+            // semantically distant (round diversity)
+            let usedEmbeddings: number[][] = [];
+            try {
+                const usedEmbRes = await this.db.query(
+                    `SELECT q.embedding FROM player_answers pa JOIN questions q ON q.id = pa.question_id WHERE pa.room_code = $1 AND q.embedding IS NOT NULL`,
+                    [roomCode]
+                );
+                usedEmbeddings = usedEmbRes.rows
+                    .map((r: any) => r.embedding)
+                    .filter((e: any) => Array.isArray(e) && e.length > 0);
+            } catch (embErr) {
+                console.warn('[advanceToNextQuestion] Failed to load used embeddings:', embErr);
+            }
+
             // Fetch game categories and difficulty
             const gameQuery = `SELECT selected_categories, difficulty_mode FROM games WHERE game_id = $1`;
             const gameResult = await this.db.query(gameQuery, [gameId]);
@@ -125,7 +140,7 @@ export class GameController {
 
             // Fetch the next question
             const nextLevel = currentLevel + 1;
-            const nextQuestion = await this.questionModel.getQuestionByLevel(nextLevel, excludeIds, categories, difficultyMode);
+            const nextQuestion = await this.questionModel.getQuestionByLevel(nextLevel, excludeIds, categories, difficultyMode, usedEmbeddings);
 
             if (!nextQuestion) {
                 console.error(`Failed to fetch question for level ${nextLevel}`);

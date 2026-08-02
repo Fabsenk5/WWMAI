@@ -37,6 +37,7 @@ CREATE TABLE questions (
     incorrect_answers TEXT[],
     translations JSONB DEFAULT '{}',
     is_active BOOLEAN DEFAULT TRUE,
+    embedding REAL[],
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT unique_question UNIQUE (category, question, difficulty)
 );

@@ -16,6 +16,7 @@ import { createServer } from 'http';
 import { Socket } from 'socket.io';
 import { initializeSocket, io as socketIoInstance } from './socketSetup';
 import { cleanupInactiveRooms } from './database/cleanupRooms';
+import { cleanupSimilarQuestions } from './database/cleanupSimilarQuestions';
 import rateLimit from 'express-rate-limit';
 import { createAdminRouter } from './routes/adminRoutes';
 
@@ -131,6 +132,15 @@ if (process.env.NODE_ENV !== 'test') {
         });
     }, ROOM_CLEANUP_INTERVAL_MS);
     console.log('[App] Scheduled inactive room cleanup to run every ' + (ROOM_CLEANUP_INTERVAL_MS / 60000) + ' minutes.');
+
+    // Question-pool similarity cleanup: 1x per day (backfills embeddings + deactivates near-duplicates)
+    const QUESTION_CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
+    setInterval(() => {
+        cleanupSimilarQuestions().catch(err => {
+            console.error('[App] Error during question similarity cleanup:', err);
+        });
+    }, QUESTION_CLEANUP_INTERVAL_MS);
+    console.log('[App] Scheduled question similarity cleanup to run every 24 hours.');
 }
 
 interface JoinRoomPayload {
