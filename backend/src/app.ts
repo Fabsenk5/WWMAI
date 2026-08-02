@@ -48,13 +48,6 @@ const generalLimiter = rateLimit({
 });
 app.use('/api', generalLimiter);
 
-const createGameLimiter = rateLimit({
-    windowMs: 60 * 60 * 1000,
-    max: 10,
-    message: 'Too many games created from this IP. Please wait a while.'
-});
-app.post('/api/games', createGameLimiter);
-
 import { checkAndSeedDatabase } from './database/seed';
 import { syncDatabaseSchema } from './database/sync_schema';
 
