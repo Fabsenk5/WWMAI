@@ -1,6 +1,6 @@
 # AGENTS.md
 
-Monorepo for **WWMAI** ("Wer wird Millionär AI") — a multiplayer "Who Wants to Be a Millionaire" trivia game with real-time WebSocket gameplay, JWT auth, AI question generation (Gemini), Stripe premium, and i18n (en/de/ru/es). Live demo is a hobby project on Render/Neon; keep free-tier constraints in mind (see "Infrastructure").
+Monorepo for **WWMAI** ("Wer wird Millionär AI") — a multiplayer "Who Wants to Be a Millionaire" trivia game with real-time WebSocket gameplay, JWT auth, AI question generation (DeepSeek), Stripe premium, and i18n (en/de/ru/es). Live demo is a hobby project on Render/Neon; keep free-tier constraints in mind (see "Infrastructure").
 
 ## Tech stack
 
@@ -34,7 +34,7 @@ backend/src/
   routes/                # gameRoutes (setRoutes factory), adminRoutes (factory), auth/billing/featureWishlist
   middleware/authMiddleware.ts  # authenticateToken, optionalAuthenticateToken (Bearer JWT)
   models/questionModel.ts       # question queries + difficulty/prize mapping
-  services/aiService.ts  # Gemini question gen, translation backfill
+  services/aiService.ts  # DeepSeek (OpenAI-compatible) question gen, translation backfill
   database/              # db.ts (Pool), seed.ts, sync_schema.ts, cleanupRooms.ts, run_migrations.ts, migrations/*.sql, schema.sql (stale base)
 backend/tests/           # questionModel, gameController, integration (uses REAL db; one broken import)
 frontend/src/
@@ -60,7 +60,7 @@ frontend/src/
 - **Jokers** (`POST /api/games/:roomCode/joker`): `5050` (2 wrong removed), `audience` (simulated % stats, reliability scales down with difficulty), `phone` (heuristic friend). Co-op = team-scoped (games.jokers_used); survival = per-player (players.jokers_used).
 
 ### AI question generation
-- `AiService.ensureCategoryPool(category, threshold)` is fired in background on game creation if pool is low; capped at 20 questions/request, difficulty split ~25/35/25/15%. Models: `gemini-3-pro-preview` → `gemini-2.5-flash-preview-09-2025` → `gemini-2.5-flash-lite-preview-09-2025` with 503-retry/fallback. Disabled without `GEMINI_API_KEY`.
+- `AiService.ensureCategoryPool(category, threshold)` is fired in background on game creation if pool is low; capped at 20 questions/request, difficulty split ~25/35/25/15%. Uses an **OpenAI-compatible chat completions endpoint** (DeepSeek): model `DEEPSEEK_MODEL` (default `deepseek-v4-flash`, fallback `deepseek-chat`), base URL `DEEPSEEK_BASE_URL` (default `https://opencode.ai/zen/go/v1`), JSON output via `response_format`. Retry (2×) on main model, then falls back. Disabled without `DEEPSEEK_API_KEY`.
 - Questions carry `translations` JSONB `{de,ru,es:{question,correct_answer,incorrect_answers}}`.
 
 ### Auth / premium
@@ -91,7 +91,7 @@ frontend/src/
 
 ## Environment
 
-`backend/.env` (see `.env.example`): `DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME`, `GEMINI_API_KEY`, plus `JWT_SECRET`, `DATABASE_URL` (prod, SSL), `CLIENT_URL`, `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID`, `STRIPE_WEBHOOK_SECRET`, `ADMIN_PASSWORD`, `PORT`. Root `.env` also used.
+`backend/.env` (see `.env.example`): `DB_HOST/DB_PORT/DB_USER/DB_PASSWORD/DB_NAME`, `DEEPSEEK_API_KEY` + `DEEPSEEK_BASE_URL` + `DEEPSEEK_MODEL`, plus `JWT_SECRET`, `DATABASE_URL` (prod, SSL), `CLIENT_URL`, `STRIPE_SECRET_KEY`, `STRIPE_PRICE_ID`, `STRIPE_WEBHOOK_SECRET`, `ADMIN_PASSWORD`, `PORT`. Root `.env` also used.
 
 ## Infrastructure
 

@@ -1,4 +1,3 @@
-import { GoogleGenerativeAI } from "@google/generative-ai";
 import { Pool } from 'pg';
 import dotenv from 'dotenv';
 import path from 'path';
@@ -6,6 +5,9 @@ import path from 'path';
 // Force load env from backend directory if not loaded
 dotenv.config({ path: path.join(__dirname, '..', '..', '.env') });
 dotenv.config();
+
+const DEFAULT_BASE_URL = 'https://opencode.ai/zen/go/v1';
+const DEFAULT_MODEL = 'deepseek-v4-flash';
 
 // Define interface for the Question structure used in DB
 interface GeneratedQuestion {
@@ -20,23 +22,105 @@ interface GeneratedQuestion {
     };
 }
 
+interface ChatMessage {
+    role: 'system' | 'user' | 'assistant';
+    content: string;
+}
+
 export class AiService {
-    private genAI: GoogleGenerativeAI | null = null;
+    private apiKey: string | null = null;
+    private baseURL: string;
+    private modelCandidates: string[];
     private db: Pool;
 
     constructor(dbPool: Pool) {
         this.db = dbPool;
-        const apiKey = process.env.GEMINI_API_KEY;
-        if (apiKey) {
-            this.genAI = new GoogleGenerativeAI(apiKey);
-            console.log(`[AiService] Initialized with API Key: ${apiKey.substring(0, 4)}...`);
+        this.apiKey = process.env.DEEPSEEK_API_KEY || null;
+        this.baseURL = (process.env.DEEPSEEK_BASE_URL || DEFAULT_BASE_URL).replace(/\/+$/, '');
+        const primaryModel = process.env.DEEPSEEK_MODEL || DEFAULT_MODEL;
+        this.modelCandidates = [primaryModel, DEFAULT_MODEL, 'deepseek-chat'];
+        if (this.apiKey) {
+            console.log(`[AiService] Initialized with DeepSeek-compatible API (base: ${this.baseURL}, model: ${primaryModel})`);
         } else {
-            console.warn("[AiService] GEMINI_API_KEY not found. AI generation will be disabled.");
+            console.warn('[AiService] DEEPSEEK_API_KEY not found. AI generation will be disabled.');
         }
     }
 
+    private async chatCompletion(options: { model: string; messages: ChatMessage[]; maxTokens?: number; json?: boolean }): Promise<string> {
+        const { model, messages, maxTokens = 12000, json = false } = options;
+        const body: Record<string, any> = {
+            model,
+            messages,
+            max_tokens: maxTokens,
+        };
+        if (json) {
+            body.response_format = { type: 'json_object' };
+        }
+
+        const res = await fetch(`${this.baseURL}/chat/completions`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Authorization': `Bearer ${this.apiKey}`,
+            },
+            body: JSON.stringify(body),
+        });
+
+        if (!res.ok) {
+            const errText = await res.text().catch(() => '');
+            throw new Error(`AI API error ${res.status}: ${errText.slice(0, 300)}`);
+        }
+
+        const data = await res.json();
+        const content = data?.choices?.[0]?.message?.content;
+        if (typeof content !== 'string' || !content.trim()) {
+            throw new Error('AI API returned empty content.');
+        }
+        return content;
+    }
+
+    private async generateWithFallback(messages: ChatMessage[], options: { json?: boolean; maxTokens?: number } = {}): Promise<string> {
+        let lastError: any = null;
+
+        for (let modelIndex = 0; modelIndex < this.modelCandidates.length; modelIndex++) {
+            const model = this.modelCandidates[modelIndex];
+            const isMainModel = modelIndex === 0;
+            const retriesToAttempt = isMainModel ? 2 : 1;
+
+            for (let attempt = 0; attempt < retriesToAttempt; attempt++) {
+                try {
+                    const content = await this.chatCompletion({ model, messages, ...options });
+                    console.log(`[AiService] ✅ Successfully generated content using "${model}"${attempt > 0 ? ` (retry ${attempt})` : ''}`);
+                    return content;
+                } catch (err: any) {
+                    lastError = err;
+                    const retriable = err.message
+                        && (err.message.includes('503') || err.message.includes('429')
+                            || err.message.includes('overloaded') || err.message.includes('Internal server error'));
+                    console.warn(`[AiService] Model "${model}" failed${attempt > 0 ? ` (retry ${attempt})` : ''}: ${err.message}`);
+
+                    if (!retriable) {
+                        break; // Move to the next model
+                    }
+                    if (attempt < retriesToAttempt - 1) {
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                    }
+                }
+            }
+        }
+
+        throw lastError || new Error('All AI models failed.');
+    }
+
+    private cleanJsonText(text: string): string {
+        return text
+            .replace(/```json/g, '')
+            .replace(/```/g, '')
+            .trim();
+    }
+
     public async ensureCategoryPool(category: string, threshold: number = 50): Promise<void> {
-        if (!this.genAI) {
+        if (!this.apiKey) {
             console.log(`[AiService] Skipping generation for '${category}': No API Key.`);
             return;
         }
@@ -150,67 +234,17 @@ ${existingQuestions.map((q, i) =>
                 }
             `;
 
-            let result;
-            // Priority: Newest/Best -> Standard Flash -> Lite Fallback
-            // With retry logic for the main model
-            const models = ["gemini-3-pro-preview", "gemini-2.5-flash-preview-09-2025", "gemini-2.5-flash-lite-preview-09-2025"];
-            const maxRetriesForMainModel = 1; // Retry the main model once before fallback
-
-            for (let modelIndex = 0; modelIndex < models.length; modelIndex++) {
-                const modelName = models[modelIndex];
-                const isMainModel = modelIndex === 0;
-                const isLast = modelIndex === models.length - 1;
-                const retriesToAttempt = isMainModel ? maxRetriesForMainModel + 1 : 1; // Main model gets retry
-
-                for (let attempt = 0; attempt < retriesToAttempt; attempt++) {
-                    try {
-                        const model = this.genAI.getGenerativeModel({
-                            model: modelName,
-                            generationConfig: {
-                                temperature: 0.9, // High creativity while following constraints
-                                topP: 0.95,
-                            }
-                        });
-                        result = await model.generateContent(prompt);
-                        console.log(`[AiService] ✅ Successfully generated questions using "${modelName}"${attempt > 0 ? ` (retry ${attempt})` : ''}`);
-                        break; // Success, exit retry loop
-                    } catch (err: any) {
-                        const isLastAttempt = attempt === retriesToAttempt - 1;
-                        const isOverloaded = err.message && (err.message.includes('503') || err.message.includes('Service Unavailable') || err.message.includes('overloaded'));
-
-                        if (isOverloaded) {
-                            console.warn(`[AiService] ⚠️ Model "${modelName}" overloaded (503)${attempt > 0 ? ` (retry ${attempt})` : ''}. ${isLastAttempt ? (isLast ? 'All models failed.' : 'Switching to next model...') : 'Retrying...'}`);
-                        } else {
-                            console.warn(`[AiService] ⚠️ Model "${modelName}" failed: ${err.message}${attempt > 0 ? ` (retry ${attempt})` : ''}. ${isLastAttempt ? (isLast ? 'All models failed.' : 'Switching to next model...') : 'Retrying...'}`);
-                        }
-
-                        if (isLastAttempt && isLast) {
-                            throw err; // Throw the final error if we ran out of all models and retries
-                        }
-
-                        if (isLastAttempt) {
-                            break; // Exit retry loop, move to next model
-                        }
-
-                        // Wait a bit before retrying
-                        await new Promise(resolve => setTimeout(resolve, 1000));
-                    }
-                }
-
-                if (result) break; // Successfully got result, exit model loop
-            }
-
-            if (!result) {
-                throw new Error("Generative AI produced no result.");
-            }
-
-            const response = result.response;
-            let text = response.text();
-
-            console.log(`[AiService] Raw response from Gemini (first 200 chars): ${text.substring(0, 200)}...`);
+            const responseText = await this.generateWithFallback(
+                [
+                    { role: 'system', content: 'You are a trivia question generator. You always respond with valid JSON only.' },
+                    { role: 'user', content: prompt },
+                ],
+                { json: true, maxTokens: 12000 }
+            );
 
             // Cleanup potential markdown code blocks
-            text = text.replace(/```json/g, '').replace(/```/g, '').trim();
+            const text = this.cleanJsonText(responseText);
+            console.log(`[AiService] Raw response from AI (first 200 chars): ${text.substring(0, 200)}...`);
 
             let questions: GeneratedQuestion[];
             try {
@@ -260,7 +294,7 @@ ${existingQuestions.map((q, i) =>
     }
 
     public async backfillTranslations(limit: number = 50): Promise<void> {
-        if (!this.genAI) {
+        if (!this.apiKey) {
             console.warn('[AiService] No API Key. Cannot backfill translations.');
             return;
         }
@@ -311,10 +345,15 @@ ${existingQuestions.map((q, i) =>
                 `;
 
                 try {
-                    const model = this.genAI.getGenerativeModel({ model: "gemini-2.5-flash-preview-09-2025" });
-                    const result = await model.generateContent(prompt);
-                    const responseText = result.response.text().replace(/```json/g, '').replace(/```/g, '').trim();
-                    const translatedBatch = JSON.parse(responseText);
+                    const responseText = await this.generateWithFallback(
+                        [
+                            { role: 'system', content: 'You are a translation engine. You always respond with valid JSON only.' },
+                            { role: 'user', content: prompt },
+                        ],
+                        { json: true, maxTokens: 8000 }
+                    );
+
+                    const translatedBatch = JSON.parse(this.cleanJsonText(responseText));
 
                     for (const item of translatedBatch) {
                         if (item.id && item.translations) {

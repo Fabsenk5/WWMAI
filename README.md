@@ -24,7 +24,7 @@ A modern, feature-rich multiplayer trivia game based on "Who Wants to Be a Milli
 - **📈 Player Statistics**: Detailed analytics on wins, losses, accuracy, and more
 
 ### Advanced Features
-- **🤖 AI Question Generation**: Dynamic question creation powered by Google's Gemini AI
+- **🤖 AI Question Generation**: Dynamic question creation powered by DeepSeek (OpenAI-compatible API)
 - **👨‍💼 Admin Dashboard**: Comprehensive management interface for questions, users, and game settings
 - **🌍 Internationalization**: Multi-language support (English, German, Spanish, and more)
 - **💎 Premium Features**: Stripe integration for premium subscriptions
@@ -64,8 +64,8 @@ A modern, feature-rich multiplayer trivia game based on "Who Wants to Be a Milli
    # JWT Authentication
    JWT_SECRET=your_jwt_secret_key
    
-   # AI Question Generation (Optional)
-   GEMINI_API_KEY=your_gemini_api_key
+    # AI Question Generation (Optional)
+    DEEPSEEK_API_KEY=your_deepseek_compatible_api_key
    
    # Payment Integration (Optional)
    STRIPE_SECRET_KEY=your_stripe_secret_key
@@ -167,7 +167,7 @@ WWMAI/
 - **PostgreSQL 8** - Database with `pg` driver
 - **JWT** - Authentication
 - **Bcrypt 6.0** - Password hashing
-- **Google Generative AI 0.24** - AI question generation
+- **DeepSeek (OpenAI-compatible) 0.x** - AI question generation
 - **Stripe 20.0** - Payment processing
 - **Express Rate Limit 8.2** - API rate limiting
 
@@ -216,7 +216,7 @@ The game includes audio files from the "Who Wants to Be a Millionaire" televisio
 > **Disclaimer**: "Who Wants to Be a Millionaire" is a registered trademark. This project is a fan-made educational implementation and is not affiliated with, endorsed by, or associated with the official franchise or copyright holders.
 
 #### AI Services
-- **Google Generative AI (Gemini)**: Used for dynamic question generation under Google's [Terms of Service](https://policies.google.com/terms)
+- **DeepSeek (OpenAI-compatible API)**: Used for dynamic question generation via `DEEPSEEK_API_KEY`/`DEEPSEEK_BASE_URL`/`DEEPSEEK_MODEL` (default model `deepseek-v4-flash`).
 
 ## 🤝 Contributing
 
@@ -287,7 +287,7 @@ See `.github/workflows/` for CI/CD configurations.
 Ensure all environment variables are set in your hosting platform:
 - Database credentials (Neon connection string)
 - JWT secret
-- Gemini API key (if using AI features)
+- DeepSeek API key (if using AI features)
 - Stripe keys (if using premium features)
 
 ## 📱 Browser Support
