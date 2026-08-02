@@ -139,19 +139,21 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
 
         // --- Final Answer Sounds ---
+        // NOTE: the original "Final Answer" stingers are not shipped; the
+        // level's question track is used instead (all exist in /assets/audio).
         if (type === 'final_answer') {
-            if (level <= 5) return '08 Four Answers in Order.mp3'; // Fallback
-            if (level === 6) return '15 $2,000 Final Answer-.mp3';
-            if (level === 7) return '20 $4,000 Final Answer-.mp3';
-            if (level === 8) return '25 $8,000 Final Answer-.mp3';
-            if (level === 9) return '30 $16,000 Final Answer-.mp3';
-            if (level === 10) return '35 $32,000 Final Answer-.mp3';
-            if (level === 11) return '40 $64,000 Final Answer-.mp3';
-            if (level === 12) return '45 $125,000 Final Answer-.mp3';
-            if (level === 13) return '50 $250,000 Final Answer-.mp3';
-            if (level === 14) return '55 $500,000 Final Answer-.mp3';
-            if (level === 15) return '60 $1,000,000 Final Answer-.mp3';
-            return '07 Fastest Finger First.mp3'; // Generic Fallback
+            if (level <= 5) return '11 $100-$1,000 Questions.mp3';
+            if (level === 6) return '14 $2,000 Question.mp3';
+            if (level === 7) return '19 $4,000 Question.mp3';
+            if (level === 8) return '24 $8,000 Question.mp3';
+            if (level === 9) return '29 $16,000 Question.mp3';
+            if (level === 10) return '34 $32,000 Question.mp3';
+            if (level === 11) return '39 $64,000 Question.mp3';
+            if (level === 12) return '44 $125,000 Question.mp3';
+            if (level === 13) return '49 $250,000 Question.mp3';
+            if (level === 14) return '54 $500,000 Question.mp3';
+            if (level === 15) return '59 $1,000,000 Question.mp3';
+            return '11 $100-$1,000 Questions.mp3'; // Generic Fallback
         }
 
         // --- Win Sounds ---

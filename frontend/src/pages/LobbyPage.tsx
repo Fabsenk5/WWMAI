@@ -222,7 +222,17 @@ const LobbyPage: React.FC = () => {
       // Audio: Win/Lose
       stopAll(); // Stop background tension
       const level = data.currentLevel || 1;
-      if (data.isTeamCorrect) {
+      // Survival has no teamAnswer/isTeamCorrect — use the player's own result
+      let isCorrectForSound = data.isTeamCorrect;
+      if (data.gameMode === 'survival') {
+        const myName = getSafeStorage('userName');
+        const myUserId = getSafeStorage('userId');
+        const myResult = data.playerAnswers.find(p =>
+          (myUserId && (p as any).userId === myUserId) || p.name === myName
+        );
+        isCorrectForSound = myResult ? myResult.is_correct : true;
+      }
+      if (isCorrectForSound) {
         playSFX(getAudioForLevel(level, 'win'));
       } else {
         playSFX(getAudioForLevel(level, 'lose'));

@@ -1104,9 +1104,10 @@ export class GameController {
                 }
             } else {
                 // Survival
-                // FIXED: Scope to the current game using game_id to avoid cross-game collisions
-                const playerQuery = `SELECT jokers_used FROM players WHERE userId = $1 AND game_id = $2`;
-                const playerResult = await this.db.query(playerQuery, [userId, game_id]);
+                // FIXED: players.game_id is never populated — lookup by room_code
+                // (unique via UNIQUE(userId, room_code)) instead of game_id
+                const playerQuery = `SELECT jokers_used FROM players WHERE userId = $1 AND room_code = $2`;
+                const playerResult = await this.db.query(playerQuery, [userId, roomCode]);
                 if (playerResult.rows.length === 0) {
                     res.status(404).json({ error: 'Player not found in this game.' });
                     return;
@@ -1234,7 +1235,7 @@ export class GameController {
                 // Broadcast to update all clients that team joker is used
                 this.io.to(roomCode).emit('jokerUsed', { jokerType, userId: 'TEAM' });
             } else {
-                await this.db.query(`UPDATE players SET jokers_used = array_append(jokers_used, $1) WHERE userId = $2`, [jokerType, userId]);
+                await this.db.query(`UPDATE players SET jokers_used = array_append(jokers_used, $1) WHERE userId = $2 AND room_code = $3`, [jokerType, userId, roomCode]);
                 // Emit event so frontend plays audio and updates UI if needed
                 this.io.to(roomCode).emit('jokerUsed', { jokerType, userId });
             }
