@@ -21,8 +21,8 @@ cd frontend && npm run build    # react-scripts build
 docker-compose up               # backend + frontend + postgres:13 + cleanup service
 ```
 
-- Always start the backend first; it **auto-creates/syncs the DB schema on boot** (`syncDatabaseSchema` in `backend/src/database/sync_schema.ts`).
-- DB reset: run `schema.sql` (destructive, drops all) then re-seed.
+- Always start the backend first; it **auto-creates/syncs the DB schema on boot** (`syncDatabaseSchema` in `backend/src/database/sync_schema.ts`) and auto-seeds if the `questions` table is empty. `sync_schema.ts` is the schema source of truth (tables: users, questions, games, players, player_answers, system_settings, feature_wishes, rooms, game_questions).
+- DB reset: run `backend/database/schema.sql` (destructive, drops all — kept in sync with `sync_schema.ts`) then restart the backend to re-seed.
 
 ## Repo layout (key paths)
 
@@ -82,12 +82,12 @@ frontend/src/
 
 ## Gotchas (read before editing)
 
-- `integration.test.ts` imports `../src/database/database/seed` (double `database`) — likely broken; keep tests green with `npm test` from root (backend tests mock `pg`; integration needs a live DB).
+- `integration.test.ts` needs a **live DB**; it now pings the DB in `beforeAll` and skips gracefully when none is reachable, so root `npm test` stays green without Postgres. When a DB is up it **drops and recreates all tables** — never point it at a DB with real data.
 - `backend/package.json` `test` script references a missing `jest.config.js` — use root `npm test`.
-- `schema.sql` uses old `games.id`/`questions.question_id` naming; current code/DB use `games.game_id`/`questions.id`. Don't trust schema.sql for column names.
-- Docs (`DEVELOPER_GUIDE.md`, `README.md`) reference scripts/behaviors that no longer exist (`resetAndApplySchema.ts`, `npm run seed-db`, `reset-db`) — treat them as illustrative.
-- Backend root contains leftover dev scripts (`change_password.ts`, `check_cars.ts`, `list_models.ts`, `migrate_*.ts`, `sim_fetch.ts`, `*.txt` outputs) — not part of the app; do not import them. `debug_output.txt` contains real user data — do not commit.
-- Frontend has `src_backup/` — don't edit it.
+- Docs (`DEVELOPER_GUIDE.md`, `README.md`) were partially updated; older prose may still reference removed scripts (`resetAndApplySchema.ts`, `reset-db`, `seed-db`) — treat leftovers as illustrative.
+- `backend/database/schema.sql` (fresh-install reset) and `backend/src/database/sync_schema.ts` (boot sync) must stay in sync when changing the schema. `jokers_used` (games+players) and `players.game_id` live in both.
+- `frontend/src_backup/` contains an old frontend snapshot — don't edit it.
+- Leftover local backup branches `cleanup-backup`/`v1-backup` still contain old history (incl. the purged `debug_output.txt`) — don't push them.
 
 ## Environment
 

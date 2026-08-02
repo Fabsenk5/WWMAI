@@ -77,8 +77,10 @@ const performKeepAlive = async () => {
 
 // Run every 14 minutes (keeps Render awake, but allows Neon to conserve compute)
 const KEEP_ALIVE_INTERVAL = 14 * 60 * 1000;
-setInterval(performKeepAlive, KEEP_ALIVE_INTERVAL);
-console.log('[App] Database keep-alive scheduled every 14 minutes.');
+if (process.env.NODE_ENV !== 'test') {
+    setInterval(performKeepAlive, KEEP_ALIVE_INTERVAL);
+    console.log('[App] Database keep-alive scheduled every 14 minutes.');
+}
 
 const server = createServer(app);
 
@@ -116,12 +118,14 @@ app.get('/health', async (req, res) => {
     });
 });
 
-setInterval(() => {
-    cleanupInactiveRooms().catch(err => {
-        console.error("[App] Error during scheduled room cleanup:", err);
-    });
-}, ROOM_CLEANUP_INTERVAL_MS);
-console.log('[App] Scheduled inactive room cleanup to run every ' + (ROOM_CLEANUP_INTERVAL_MS / 60000) + ' minutes.');
+if (process.env.NODE_ENV !== 'test') {
+    setInterval(() => {
+        cleanupInactiveRooms().catch(err => {
+            console.error("[App] Error during scheduled room cleanup:", err);
+        });
+    }, ROOM_CLEANUP_INTERVAL_MS);
+    console.log('[App] Scheduled inactive room cleanup to run every ' + (ROOM_CLEANUP_INTERVAL_MS / 60000) + ' minutes.');
+}
 
 interface JoinRoomPayload {
     roomCode: string;
@@ -181,3 +185,4 @@ if (process.env.NODE_ENV !== 'test') {
 }
 
 export { server };
+export { socketIoInstance as io };

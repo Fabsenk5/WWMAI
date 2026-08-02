@@ -28,6 +28,20 @@ export const syncDatabaseSchema = async () => {
         `);
         console.log('[Schema Sync] Verified users table.');
 
+        // Check and Add Missing Columns (helper used by all sections below)
+        const addColumnIfNotExists = async (table: string, column: string, type: string) => {
+            const check = await client.query(`
+                SELECT column_name 
+                FROM information_schema.columns 
+                WHERE table_name = $1 AND column_name = $2
+            `, [table, column]);
+
+            if (check.rows.length === 0) {
+                console.log(`[Schema Sync] Adding missing column ${column} to ${table}...`);
+                await client.query(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
+            }
+        };
+
         // 1b. Ensure 'questions' table exists (MISSING before: fresh installs broke)
         await client.query(`
             CREATE TABLE IF NOT EXISTS questions (
@@ -48,21 +62,14 @@ export const syncDatabaseSchema = async () => {
         await addColumnIfNotExists('questions', 'translations', "JSONB DEFAULT '{}'");
         await addColumnIfNotExists('questions', 'is_active', 'BOOLEAN DEFAULT TRUE');
 
-        // 1c. Ensure 'rooms' + 'game_questions' tables exist (required by seed.ts)
+        // 1c. Ensure 'rooms' table exists (required by seed.ts)
         await client.query(`
             CREATE TABLE IF NOT EXISTS rooms (
                 id SERIAL PRIMARY KEY,
                 last_activity TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             );
         `);
-        await client.query(`
-            CREATE TABLE IF NOT EXISTS game_questions (
-                game_id INT REFERENCES games(game_id) ON DELETE CASCADE,
-                question_id INT REFERENCES questions(id) ON DELETE CASCADE,
-                PRIMARY KEY (game_id, question_id)
-            );
-        `);
-        console.log('[Schema Sync] Verified rooms + game_questions tables.');
+        console.log('[Schema Sync] Verified rooms table.');
 
         // 2. Ensure 'games' table exists
         await client.query(`
@@ -85,19 +92,15 @@ export const syncDatabaseSchema = async () => {
         `);
         console.log('[Schema Sync] Verified games table.');
 
-        // 3. Check and Add Missing Columns for 'games'
-        const addColumnIfNotExists = async (table: string, column: string, type: string) => {
-            const check = await client.query(`
-                SELECT column_name 
-                FROM information_schema.columns 
-                WHERE table_name = $1 AND column_name = $2
-            `, [table, column]);
-
-            if (check.rows.length === 0) {
-                console.log(`[Schema Sync] Adding missing column ${column} to ${table}...`);
-                await client.query(`ALTER TABLE ${table} ADD COLUMN ${column} ${type}`);
-            }
-        };
+        // 2b. Ensure 'game_questions' join table exists (requires games + questions)
+        await client.query(`
+            CREATE TABLE IF NOT EXISTS game_questions (
+                game_id INT REFERENCES games(game_id) ON DELETE CASCADE,
+                question_id INT REFERENCES questions(id) ON DELETE CASCADE,
+                PRIMARY KEY (game_id, question_id)
+            );
+        `);
+        console.log('[Schema Sync] Verified game_questions table.');
 
         await addColumnIfNotExists('games', 'host_id', 'INT REFERENCES users(id)');
         await addColumnIfNotExists('games', 'difficulty_mode', "VARCHAR(20) DEFAULT 'standard'");

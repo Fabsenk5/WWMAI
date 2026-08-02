@@ -29,7 +29,7 @@ services:
       - ./frontend/src:/app/src
     environment:
       - NODE_ENV=development
-      - REACT_APP_API_URL=backend
+      - REACT_APP_API_URL=http://backend:5000
     depends_on:
       - backend
 
@@ -44,7 +44,6 @@ services:
     volumes:
       - db_data:/var/lib/postgresql/data
       - ./backend/database:/docker-entrypoint-initdb.d
-
   cleanup:
     build:
       context: ./backend

@@ -89,9 +89,9 @@ A modern, feature-rich multiplayer trivia game based on "Who Wants to Be a Milli
 4. **Set up the database**
    ```bash
    cd backend
-   npm run reset-db  # Creates tables from schema
-   npm run seed      # Seeds initial questions (optional)
+   npm run dev   # auto-creates/syncs the schema on boot, then seeds if empty
    ```
+   To fully reset the DB, run `backend/database/schema.sql` (destructive) and restart the backend — it re-seeds automatically.
 
 ### Running the Application
 
@@ -250,26 +250,17 @@ For security concerns, please **do not** open a public issue. Instead, contact t
 
 ### Running Tests
 ```bash
-# Backend tests
-cd backend
-npm test
-
-# Frontend tests
-cd frontend
+# Backend tests (from the repo root; jest config lives at the root)
 npm test
 ```
 
 ### Database Management
 ```bash
-# Reset database schema
+# Seed questions if the table is empty (auto-seeds on backend boot too)
 cd backend
-npm run reset-db
-
-# Seed questions
 npm run seed
 
-# Manual cleanup of inactive rooms
-npm run cleanup
+# Full reset: run backend/database/schema.sql (destructive), then restart the backend
 ```
 
 ### Building for Production

@@ -2,7 +2,16 @@ import { Request, Response } from 'express';
 import Stripe from 'stripe';
 import pool from '../database/db';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '');
+// Stripe is optional (see README). Lazy-init so the app still boots without keys.
+const stripeKey = process.env.STRIPE_SECRET_KEY;
+let stripe: Stripe | null = null;
+if (stripeKey) {
+    try {
+        stripe = new Stripe(stripeKey);
+    } catch (err) {
+        console.warn('[BillingController] Invalid STRIPE_SECRET_KEY. Stripe features disabled.');
+    }
+}
 
 export class BillingController {
 
@@ -11,6 +20,11 @@ export class BillingController {
             const userId = req.user?.userId;
             if (!userId) {
                 res.status(401).json({ error: 'Unauthorized' });
+                return;
+            }
+
+            if (!stripe) {
+                res.status(503).json({ error: 'Billing is not configured on this server.' });
                 return;
             }
 
@@ -44,6 +58,11 @@ export class BillingController {
     public handleWebhook = async (req: Request, res: Response): Promise<void> => {
         const sig = req.headers['stripe-signature'] as string;
         let event: Stripe.Event;
+
+        if (!stripe) {
+            res.status(503).send('Billing is not configured on this server.');
+            return;
+        }
 
         try {
             // req.body must be raw buffer here. app.ts configuration is crucial.

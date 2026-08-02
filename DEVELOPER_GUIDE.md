@@ -181,14 +181,14 @@ This ensures consistency across all clients while providing immediacy for game e
 ### Adding New Questions
 
 To add questions to the database:
-1. Create SQL INSERT statements in a seed file
+1. Add entries to the seed array in `backend/src/database/seed.ts`
 2. Ensure each question has:
    - category (string)
    - difficulty (easy, medium, hard)
    - question text
    - correct_answer
    - incorrect_answers (array of 3 options)
-3. Run the seed script: `npm run seed-db`
+3. Run `npm run seed` (from `backend/`) or restart the backend — it seeds automatically when the table is empty
 
 ### Adding New Socket Events
 
@@ -201,8 +201,7 @@ When adding new real-time features:
 ### Database Schema Evolution
 
 When modifying the database schema:
-1. Update the schema.sql file with new columns/tables
-2. Ensure foreign keys and constraints maintain data integrity
-3. Add migration scripts for existing deployments
-4. Update the resetAndApplySchema.ts script
-5. Update related models and controllers
+1. Update `backend/src/database/sync_schema.ts` (idempotent, runs on every boot — the primary mechanism)
+2. For existing deployments, add a file to `backend/src/database/migrations/` and run `backend/src/database/run_migrations.ts`
+3. Keep `backend/database/schema.sql` in sync for fresh installs / full resets
+4. Update related models and controllers

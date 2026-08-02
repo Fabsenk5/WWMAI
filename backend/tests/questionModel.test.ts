@@ -37,19 +37,20 @@ describe('QuestionModel', () => {
         })));
     });
 
-    it('should fetch questions by category and difficulty', async () => {
+    it('should fetch questions by difficulty', async () => {
         const mockQuestions = [
             { id: 1, category: 'Science', difficulty: 'easy', question: 'What is H2O?', correct_answer: 'Water', incorrect_answers: ['Oxygen', 'Hydrogen'] },
         ];
         mockDb.query.mockResolvedValue({ rows: mockQuestions });
 
-        const result = await questionModel.getQuestions('Science', 'easy', 1);
+        const result = await questionModel.getQuestionsByDifficulty('easy', [], 1);
 
         expect(mockDb.query).toHaveBeenCalledWith(
-            'SELECT * FROM questions WHERE category = $1 AND difficulty = $2 LIMIT $3',
-            ['Science', 'easy', 1]
+            'SELECT * FROM questions WHERE is_active = true AND difficulty = $1 ORDER BY RANDOM() LIMIT $2',
+            ['easy', 1]
         );
-        expect(result).toEqual(mockQuestions);
+        expect(result).toHaveLength(1);
+        expect(result[0]).toMatchObject(mockQuestions[0]);
     });
 
     it('should fetch a question by ID', async () => {
@@ -58,7 +59,7 @@ describe('QuestionModel', () => {
 
         const result = await questionModel.getQuestionById(1);
 
-        expect(mockDb.query).toHaveBeenCalledWith('SELECT * FROM questions WHERE question_id = $1', [1]);
-        expect(result).toEqual(mockQuestion);
+        expect(mockDb.query).toHaveBeenCalledWith('SELECT * FROM questions WHERE id = $1', [1]);
+        expect(result).toMatchObject(mockQuestion);
     });
 });
