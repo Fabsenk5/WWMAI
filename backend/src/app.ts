@@ -1,6 +1,8 @@
 import express from 'express';
 // import { json } from 'body-parser'; // Removed to allow conditional parsing for webhooks
 import { json } from 'express'; // Standard express json parser
+import helmet from 'helmet';
+import compression from 'compression';
 import requestIp from 'request-ip';
 import authRoutes from './routes/authRoutes';
 import billingRoutes from './routes/billingRoutes'; // Import billingRoutes
@@ -24,6 +26,10 @@ const PORT = process.env.PORT || 5000;
 const ROOM_CLEANUP_INTERVAL_MS = 5 * 60 * 1000;
 
 app.set('trust proxy', 1);
+
+// Security headers + response compression
+app.use(helmet());
+app.use(compression());
 
 // Middleware
 
@@ -145,7 +151,7 @@ socketIoInstance.on('connection', (socket: Socket) => {
         try {
             console.log(`Socket ${socket.id} attempting to join room: ${roomCode} as userId: ${userId}, playerName: ${playerName} `);
 
-            const roomExistsQuery = 'SELECT * FROM games WHERE room_code = $1';
+            const roomExistsQuery = 'SELECT game_id, host_id FROM games WHERE room_code = $1';
             const roomResult = await pool.query(roomExistsQuery, [roomCode]);
             if (roomResult.rows.length === 0) {
                 console.warn(`Socket ${socket.id} tried to join non - existent room: ${roomCode} `);
@@ -156,7 +162,14 @@ socketIoInstance.on('connection', (socket: Socket) => {
             const playerExistsQuery = 'SELECT * FROM players WHERE userId = $1 AND room_code = $2';
             const playerResult = await pool.query(playerExistsQuery, [userId, roomCode]);
             if (playerResult.rows.length === 0) {
-                console.warn(`Socket ${socket.id} (userId: ${userId}) not found in players table for room ${roomCode}.PlayerName from socket: ${playerName} `);
+                // Not a player in this room — allow only the game host (moderator mode)
+                const hostId = roomResult.rows[0]?.host_id;
+                if (hostId === null || hostId === undefined || String(hostId) !== String(userId)) {
+                    console.warn(`Socket ${socket.id} (userId: ${userId}) is not a member of room ${roomCode}. Rejecting join.`);
+                    socket.emit('error', { message: 'You are not a member of this room.' });
+                    return;
+                }
+                console.log(`Socket ${socket.id} (userId: ${userId}) joined as HOST of room ${roomCode}.`);
             } else {
                 console.log(`Player ${playerResult.rows[0].name} (userId: ${userId}) confirmed in room ${roomCode}. Socket PlayerName: ${playerName}`);
             }

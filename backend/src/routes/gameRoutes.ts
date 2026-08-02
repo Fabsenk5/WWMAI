@@ -54,7 +54,7 @@ export function setRoutes(app: Application) {
     // Bind the controller methods to the instance
     router.post('/create', createGameLimiter, optionalAuthenticateToken, gameController.createGame.bind(gameController));
     router.post('/join', gameController.joinGame.bind(gameController));
-    router.post('/:roomCode/start', checkRoomExists, gameController.startGame.bind(gameController));
+    router.post('/:roomCode/start', optionalAuthenticateToken, checkRoomExists, gameController.startGame.bind(gameController));
     router.post('/:roomCode/answer', checkRoomExists, gameController.handleAnswer.bind(gameController));
     router.post('/:roomCode/submit-answer', checkRoomExists, gameController.submitAnswer.bind(gameController));
     router.post('/:roomCode/joker', checkRoomExists, gameController.useJoker.bind(gameController));
@@ -67,7 +67,7 @@ export function setRoutes(app: Application) {
     router.get('/categories', gameController.getCategories.bind(gameController));
     router.get('/list-active', gameController.getActiveGames.bind(gameController));
     router.get('/:id', gameController.getGameById.bind(gameController)); // Uses game ID
-    router.get('/:roomCode/current-question', checkRoomExists, gameController.getCurrentQuestion.bind(gameController));
+    router.get('/:roomCode/current-question', optionalAuthenticateToken, checkRoomExists, gameController.getCurrentQuestion.bind(gameController));
     router.get('/:id/state', gameController.getGameState.bind(gameController)); // Uses game ID
     router.get('/:roomCode/players', gameController.getPlayers.bind(gameController));
 }

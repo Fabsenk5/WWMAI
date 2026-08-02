@@ -270,9 +270,10 @@ export class GameController {
                 return;
             }
 
-            // Check if host is premium. 
-            // req.user has the role from the token.
-            if (req.user.role !== 'premium') {
+            // Check if host is premium — fresh from DB (JWT role can be stale for up to 24h)
+            const statusQuery = `SELECT subscription_status FROM users WHERE id = $1`;
+            const statusResult = await this.db.query(statusQuery, [requesterId]);
+            if (statusResult.rows.length === 0 || statusResult.rows[0].subscription_status !== 'premium') {
                 res.status(403).json({ error: 'Host kick function is a Premium feature.' });
                 return;
             }
@@ -638,7 +639,9 @@ export class GameController {
 
     public async startGame(req: Request, res: Response): Promise<void> {
         let firstQuestion: any = null; // Declare firstQuestion here to make it accessible in the broader scope
+        let hostId: any = null; // Declare hostId here to make it accessible after the transaction
         const { roomCode } = req.params;
+        const requestingUserId = req.body?.userId || (req as any).user?.userId;
         console.log('startGame method invoked with roomCode:', roomCode);
 
         if (!roomCode) {
@@ -651,7 +654,7 @@ export class GameController {
         try {
             await client.query('BEGIN');
 
-            const gameCheckQuery = 'SELECT game_id, status, selected_categories, difficulty_mode FROM games WHERE room_code = $1';
+            const gameCheckQuery = 'SELECT game_id, status, selected_categories, difficulty_mode, host_id FROM games WHERE room_code = $1';
             const gameCheckResult = await client.query(gameCheckQuery, [roomCode]);
 
             if (gameCheckResult.rows.length === 0) {
@@ -661,6 +664,7 @@ export class GameController {
             }
 
             const game = gameCheckResult.rows[0];
+            hostId = game.host_id;
             if (game.status !== 'pending') {
                 await client.query('ROLLBACK');
                 res.status(409).json({
@@ -761,9 +765,12 @@ export class GameController {
         };
 
         // Payload for the HTTP response to the host, including correct answer
+        // (anti-cheat: only the host receives it)
+        const isHost = hostId !== null && hostId !== undefined && requestingUserId !== undefined
+            && String(hostId) === String(requestingUserId);
         const questionForHost = {
             ...questionToSendToSocket,
-            correctAnswer: firstQuestion.correct_answer
+            correctAnswer: isHost ? firstQuestion.correct_answer : undefined
         };
 
         console.log('startGame: Broadcasting gameStarted event to room:', roomCode);
@@ -1227,6 +1234,15 @@ export class GameController {
 
     public async getQuestions(req: Request, res: Response): Promise<void> {
         try {
+            // Anti-cheat: the full question bank (incl. answers) must not be public.
+            // Admin password matches the /api/admin pattern.
+            const password = req.query.password || req.body?.password;
+            const adminPassword = process.env.ADMIN_PASSWORD || 'admin';
+            if (password !== adminPassword) {
+                res.status(401).json({ error: 'Unauthorized: Invalid password' });
+                return;
+            }
+
             console.log('Fetching questions...');
             const questions = await this.questionModel.find();
             console.log(`Questions fetched: ${questions.length} questions`); // Log count instead of full data
@@ -1330,7 +1346,7 @@ export class GameController {
             const userId = req.query.userId as string || null;
 
             // Fetch the current game info using roomCode
-            const gameQuery = `SELECT current_question_id, current_level, status, selected_categories FROM games WHERE room_code = $1`;
+            const gameQuery = `SELECT current_question_id, current_level, status, selected_categories, host_id FROM games WHERE room_code = $1`;
             const gameResult = await this.db.query(gameQuery, [roomCode]);
 
             if (gameResult.rows.length === 0) {
@@ -1338,7 +1354,11 @@ export class GameController {
                 return;
             }
 
-            const { current_question_id, current_level, status, selected_categories } = gameResult.rows[0];
+            const { current_question_id, current_level, status, selected_categories, host_id } = gameResult.rows[0];
+
+            // Only the host may see the correct answer (anti-cheat)
+            const requestingUserId = (req as any).user?.userId ?? userId;
+            const isHost = host_id !== null && host_id !== undefined && String(host_id) === String(requestingUserId);
 
             // Handle non-active game states
             if (status === 'pending') {
@@ -1416,7 +1436,7 @@ export class GameController {
                         level: current_level || 1,
                         prize: getPrizeForLevel(current_level || 1),
                         options: options,
-                        correctAnswer: newQuestion.correct_answer,
+                        correctAnswer: isHost ? newQuestion.correct_answer : undefined,
                         status: status,
                         userHasAnswered: false,
                         userAnswer: null,
@@ -1480,7 +1500,7 @@ export class GameController {
                     level: current_level,
                     prize: getPrizeForLevel(current_level),
                     options: options,
-                    correctAnswer: newQuestion.correct_answer,
+                    correctAnswer: isHost ? newQuestion.correct_answer : undefined,
                     status: status,
                     userHasAnswered: userHasAnswered,
                     userAnswer: userAnswer ? userAnswer.answer : null,
@@ -1515,7 +1535,7 @@ export class GameController {
                 level: current_level,
                 prize: getPrizeForLevel(current_level),
                 options: options,
-                correctAnswer: question.correct_answer, // Include correctAnswer for the host fetching via HTTP
+                correctAnswer: isHost ? question.correct_answer : undefined,
                 status: status,
                 userHasAnswered: userHasAnswered,
                 userAnswer: userAnswer ? userAnswer.answer : null,

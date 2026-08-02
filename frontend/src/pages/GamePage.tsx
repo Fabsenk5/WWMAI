@@ -57,7 +57,10 @@ const GamePage: React.FC = () => {
         try {
           const userId = localStorage.getItem('userId');
           const userIdParam = userId ? `?userId=${userId}` : '';
-          const response = await fetch(`${API_BASE_URL}/api/games/${roomCode}/current-question${userIdParam}`);
+          const token = localStorage.getItem('token');
+          const response = await fetch(`${API_BASE_URL}/api/games/${roomCode}/current-question${userIdParam}`, {
+            headers: token ? { Authorization: `Bearer ${token}` } : {},
+          });
 
           if (!response.ok) throw new Error('Failed to fetch current question');
 
@@ -243,9 +246,15 @@ const GamePage: React.FC = () => {
   const startGame = async () => {
     if (roomCode) {
       try {
+        const userId = localStorage.getItem('userId');
+        const token = localStorage.getItem('token');
         const response = await fetch(`${API_BASE_URL}/api/games/${roomCode}/start`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+          body: JSON.stringify({ userId }),
         });
         if (response.ok) {
           const data = await response.json();
@@ -264,7 +273,10 @@ const GamePage: React.FC = () => {
       try {
         const userId = localStorage.getItem('userId');
         const userIdParam = userId ? `?userId=${userId}` : '';
-        const response = await fetch(`${API_BASE_URL}/api/games/${roomCode}/current-question${userIdParam}`);
+        const token = localStorage.getItem('token');
+        const response = await fetch(`${API_BASE_URL}/api/games/${roomCode}/current-question${userIdParam}`, {
+          headers: token ? { Authorization: `Bearer ${token}` } : {},
+        });
         if (response.ok) {
           const data = await response.json();
           if (data.error) {

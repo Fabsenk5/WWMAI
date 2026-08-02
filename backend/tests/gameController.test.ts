@@ -136,17 +136,28 @@ describe('GameController', () => {
         expect(mockRes.json).toHaveBeenCalledWith(expect.objectContaining({ message: 'Game started successfully' }));
     });
 
-    it('should fetch questions', async () => {
+    it('should fetch questions (admin password required)', async () => {
         const mockQuestions = [
             { id: 1, category: 'Science', difficulty: 'easy', question: 'What is H2O?', correct_answer: 'Water', incorrect_answers: ['Oxygen', 'Hydrogen'] },
         ];
         mockDb.query.mockResolvedValue({ rows: mockQuestions });
+        mockReq.query = { password: process.env.ADMIN_PASSWORD || 'admin' };
 
         await gameController.getQuestions(mockReq as Request, mockRes as Response);
 
         expect(mockDb.query).toHaveBeenCalledWith('SELECT * FROM questions');
         expect(mockRes.status).toHaveBeenCalledWith(200);
         expect(mockRes.json).toHaveBeenCalledWith(mockQuestions);
+    });
+
+    it('should reject question bank fetch without password', async () => {
+        mockReq.query = {};
+        mockRes.status = jest.fn().mockReturnThis();
+        mockRes.json = jest.fn();
+
+        await gameController.getQuestions(mockReq as Request, mockRes as Response);
+
+        expect(mockRes.status).toHaveBeenCalledWith(401);
     });
 
     it('should fetch a game by ID with players', async () => {
