@@ -6,7 +6,9 @@ import '../styles/Forms.css';
 import { API_BASE_URL } from '../config/api';
 import { getPublicGlobalPremiumStatus } from '../services/adminService';
 import { useTranslation } from 'react-i18next';
+import { Lock } from 'lucide-react';
 import FeatureWishlistButton from '../components/FeatureWishlistButton';
+import './CreateGamePage.css';
 
 const CreateGamePage: React.FC = () => {
     const { t } = useTranslation();
@@ -107,7 +109,7 @@ const CreateGamePage: React.FC = () => {
 
     return (
         <div className="form-page-container">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+            <div className="create-header-row">
                 <h1 style={{ margin: 0 }}>{t('title_create_game')}</h1>
                 <FeatureWishlistButton />
             </div>
@@ -164,14 +166,13 @@ const CreateGamePage: React.FC = () => {
             <div className="form-group">
                 <label>
                     Difficulty Mode:
-                    {!isPremium && <span style={{ color: 'gold', marginLeft: '10px', fontSize: '0.8em' }}>🔒 Premium Only</span>}
+                    {!isPremium && <span className="premium-lock"><Lock size={14} /> Premium Only</span>}
                 </label>
                 <select
                     className="form-select"
                     value={difficultyMode}
                     onChange={(e) => setDifficultyMode(e.target.value)}
                     disabled={loading || !isPremium}
-                    style={!isPremium ? { opacity: 0.7 } : {}}
                 >
                     <option value="standard">Standard (Classic)</option>
                     <option value="easy">Easy (More forgiving)</option>
@@ -179,8 +180,8 @@ const CreateGamePage: React.FC = () => {
                     <option value="mixed">Mixed (Random Chaos)</option>
                 </select>
                 {!isPremium && (
-                    <p className="form-hint" style={{ fontSize: '0.8em', marginTop: '5px' }}>
-                        Default is Standard. <Link to="/upgrade" style={{ color: 'gold' }}>Upgrade</Link> to unlock difficulty settings.
+                    <p className="form-hint">
+                        Default is Standard. <Link to="/upgrade">Upgrade</Link> to unlock difficulty settings.
                     </p>
                 )}
             </div>
@@ -188,7 +189,7 @@ const CreateGamePage: React.FC = () => {
             <div className="form-group">
                 <label>
                     Moderator Mode (Host View):
-                    {!isPremium && <span style={{ color: 'gold', marginLeft: '10px', fontSize: '0.8em' }}>🔒 Premium Only</span>}
+                    {!isPremium && <span className="premium-lock"><Lock size={14} /> Premium Only</span>}
                 </label>
                 <div style={{ display: 'flex', alignItems: 'center', marginTop: '5px' }}>
                     <label className="checkbox-label">
@@ -202,11 +203,11 @@ const CreateGamePage: React.FC = () => {
                     </label>
                 </div>
                 {!isPremium ? (
-                    <p className="form-hint" style={{ fontSize: '0.8em', marginTop: '5px' }}>
-                        Game auto-runs for all players by default. <Link to="/upgrade" style={{ color: 'gold' }}>Upgrade</Link> to enable Host Mode.
+                    <p className="form-hint">
+                        Game auto-runs for all players by default. <Link to="/upgrade">Upgrade</Link> to enable Host Mode.
                     </p>
                 ) : (
-                    <p className="form-hint" style={{ fontSize: '0.8em', marginTop: '5px' }}>
+                    <p className="form-hint">
                         {moderatorMode
                             ? "You will act as the Host/Moderator."
                             : "Game will auto-run. You will play as a regular player."}
@@ -250,7 +251,7 @@ const CreateGamePage: React.FC = () => {
                     <div className="form-group">
                         <label>
                             Custom Topics (AI Generated)
-                            {!isPremium && <span style={{ color: 'gold', marginLeft: '10px' }}>🔒 Premium Only</span>}
+                            {!isPremium && <span className="premium-lock"><Lock size={14} /> Premium Only</span>}
                         </label>
                         <div className="custom-topics-grid">
                             {customTopics.map((topic, index) => (
@@ -262,13 +263,12 @@ const CreateGamePage: React.FC = () => {
                                     value={topic}
                                     onChange={(e) => handleCustomTopicChange(index, e.target.value)}
                                     disabled={loading || !isPremium}
-                                    style={!isPremium ? { backgroundColor: '#333', cursor: 'not-allowed' } : {}}
                                 />
                             ))}
                         </div>
                         {(!isPremium) ? (
-                            <p className="form-hint" style={{ color: 'gold' }}>
-                                <Link to="/upgrade" style={{ color: 'gold', textDecoration: 'underline' }}>Upgrade to Premium</Link> to create games with custom topics!
+                            <p className="form-hint">
+                                <Link to="/upgrade" className="upgrade-link">Upgrade to Premium</Link> to create games with custom topics!
                             </p>
                         ) : (
                             <p className="form-hint">AI will generate questions for these topics.</p>
@@ -288,7 +288,7 @@ const CreateGamePage: React.FC = () => {
                 <div className="room-code-display">
                     <h2>Share this Room Code:</h2>
                     <p>{roomCode}</p>
-                    <p className="text-secondary" style={{ fontSize: '1rem' }}>Waiting for players...</p>
+                    <p className="text-secondary">Waiting for players...</p>
                 </div>
             )}
         </div>

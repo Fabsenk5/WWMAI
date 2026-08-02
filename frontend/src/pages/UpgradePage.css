@@ -1,0 +1,86 @@
+/* UpgradePage.css — built on the App.css design tokens */
+
+.premium-card {
+    background: var(--bg-card);
+    background-image: var(--grad-card);
+    border: 1px solid var(--accent-color);
+    box-shadow: 0 0 0 1px var(--accent-soft), var(--shadow-gold);
+    padding: 30px;
+    border-radius: var(--radius-lg);
+    margin-top: 20px;
+}
+
+.premium-card h2 {
+    color: var(--accent-color);
+}
+
+.premium-card .price {
+    font-family: var(--font-display);
+    font-size: 2em;
+    font-weight: bold;
+    color: var(--accent-color);
+    margin: 10px 0;
+}
+
+.premium-card .price-period {
+    font-size: 0.5em;
+    font-weight: normal;
+    color: var(--text-secondary);
+}
+
+.feature-list {
+    text-align: left;
+    margin: 20px auto;
+    max-width: 320px;
+    list-style-type: none;
+    padding: 0;
+}
+
+.feature-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    color: var(--text-primary);
+}
+
+.feature-check {
+    flex-shrink: 0;
+    color: var(--accent-color);
+}
+
+.premium-btn {
+    position: relative;
+    overflow: hidden;
+    font-weight: 800;
+    color: var(--text-inverse);
+}
+
+.premium-btn::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -75%;
+    width: 50%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+    transform: skewX(-20deg);
+    animation: premiumShine 3s ease-in-out infinite;
+}
+
+@keyframes premiumShine {
+    0%, 60% { left: -75%; }
+    100% { left: 125%; }
+}
+
+.premium-note {
+    margin-top: 15px;
+    font-size: 0.8em;
+    color: var(--text-muted);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .premium-btn::after {
+        animation: none;
+    }
+}

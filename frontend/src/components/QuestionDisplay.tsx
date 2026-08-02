@@ -76,7 +76,7 @@ const QuestionDisplay: React.FC<QuestionDisplayProps> = ({
     return (
         <div className="question-display">
             <h2 className="question-text">{displayText}</h2>
-            <div className="options-grid">
+                <div className="options-grid">
                 {(question.options || []).map((option: any, index: number) => {
                     // Option can be string (legacy) or object { text, translations }
                     const isLegacy = typeof option === 'string';
@@ -84,13 +84,25 @@ const QuestionDisplay: React.FC<QuestionDisplayProps> = ({
                     const optionDisplay = isLegacy
                         ? option
                         : (option.translations && option.translations[language] ? option.translations[language] : option.text);
+                    const prefix = String.fromCharCode(65 + index);
+                    const isCorrectOption = showCorrectAnswer && !!question.correctAnswer && optionEn === question.correctAnswer;
+                    const isWrongOption = showCorrectAnswer && !!question.correctAnswer && optionEn !== question.correctAnswer;
 
                     return isHost ? (
-                        <div key={index} className="option-button-host">
+                        <div
+                            key={index}
+                            className={`option-button-host ${isCorrectOption ? 'option-correct' : ''} ${isWrongOption ? 'option-wrong' : ''}`}
+                        >
+                            <span className="option-prefix">{prefix}</span>
                             {optionDisplay}
                         </div>
                     ) : (
-                        <button key={index} onClick={() => handleAnswerClick(optionEn)} className="option-button-player">
+                        <button
+                            key={index}
+                            onClick={() => handleAnswerClick(optionEn)}
+                            className={`option-button-player ${isCorrectOption ? 'option-correct' : ''} ${isWrongOption ? 'option-wrong' : ''}`}
+                        >
+                            <span className="option-prefix">{prefix}</span>
                             {optionDisplay}
                         </button>
                     );

@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import '../styles/Forms.css';
+import '../pages/UpgradePage.css';
 import { API_BASE_URL } from '../config/api';
+import { Check } from 'lucide-react';
 
 const UpgradePage: React.FC = () => {
     const { user } = useAuth();
@@ -42,41 +44,34 @@ const UpgradePage: React.FC = () => {
         <div className="form-page-container" style={{ maxWidth: '800px' }}>
             <h1>Upgrade to <span className="highlight-text">Premium</span></h1>
 
-            <div className="premium-card" style={{
-                background: 'rgba(255, 215, 0, 0.1)',
-                border: '2px solid gold',
-                padding: '30px',
-                borderRadius: '15px',
-                marginTop: '20px'
-            }}>
-                <h2 style={{ color: 'gold' }}>Premium Plan</h2>
-                <p className="price" style={{ fontSize: '2em', fontWeight: 'bold' }}>€5.00 <span style={{ fontSize: '0.5em', fontWeight: 'normal' }}>/ month</span></p>
+            <div className="premium-card">
+                <h2>Premium Plan</h2>
+                <p className="price">€5.00 <span className="price-period">/ month</span></p>
 
-                <ul style={{ textAlign: 'left', margin: '20px auto', maxWidth: '300px', listStyleType: 'none' }}>
-                    <li style={{ marginBottom: '10px' }}>✅ Custom Categories (AI Generated)</li>
-                    <li style={{ marginBottom: '10px' }}>✅ Host Controls (Kick, Pause, End)</li>
-                    <li style={{ marginBottom: '10px' }}>✅ Exclusive Profile Badge</li>
-                    <li style={{ marginBottom: '10px' }}>✅ Support Development</li>
+                <ul className="feature-list">
+                    <li className="feature-item"><Check className="feature-check" size={18} /> Custom Categories (AI Generated)</li>
+                    <li className="feature-item"><Check className="feature-check" size={18} /> Host Controls (Kick, Pause, End)</li>
+                    <li className="feature-item"><Check className="feature-check" size={18} /> Exclusive Profile Badge</li>
+                    <li className="feature-item"><Check className="feature-check" size={18} /> Support Development</li>
                 </ul>
 
                 {error && <div className="error-message">{error}</div>}
 
                 {user?.subscription_status === 'premium' ? (
-                    <button className="form-submit-btn" disabled style={{ background: 'grey', cursor: 'default' }}>
+                    <button className="form-submit-btn" disabled>
                         You are already Premium!
                     </button>
                 ) : (
                     <button
                         onClick={handleSubscribe}
-                        className="form-submit-btn"
+                        className="form-submit-btn premium-btn"
                         disabled={loading}
-                        style={{ background: 'linear-gradient(45deg, #FFD700, #FFA500)', color: 'black', fontWeight: 'bold' }}
                     >
                         {loading ? 'Redirecting...' : 'Get Premium Now'}
                     </button>
                 )}
 
-                <p style={{ marginTop: '15px', fontSize: '0.8em', color: '#ccc' }}>
+                <p className="premium-note">
                     Secure payment via Stripe. Cancel anytime.
                 </p>
             </div>

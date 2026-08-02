@@ -1,9 +1,11 @@
 import React, { useState, useContext, useEffect } from 'react'; // Import useContext and useEffect
 import { useNavigate } from 'react-router-dom';
+import { KeyRound, User, ArrowRight } from 'lucide-react';
 import { GameContext } from '../context/GameContext'; // Import GameContext
 import { useAuth } from '../context/AuthContext'; // Import useAuth
 import axios from 'axios'; // Import axios
 import '../styles/Forms.css'; // Import shared form styles
+import './AuthPages.css';
 
 import { API_BASE_URL } from '../config/api';
 import { useTranslation } from 'react-i18next';
@@ -82,37 +84,47 @@ const JoinGamePage: React.FC = () => {
 
     return (
         <div className="form-page-container">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <h1 style={{ margin: 0 }}>{t('title_join_game')}</h1>
+            <div className="page-header-row">
+                <h1>
+                    <KeyRound size={24} aria-hidden="true" />
+                    {t('title_join_game')}
+                </h1>
                 <FeatureWishlistButton />
             </div>
             <form onSubmit={handleJoinGame}>
                 <div className="form-group">
                     <label htmlFor="roomCode">{t('label_room_code')}</label>
-                    <input
-                        type="text"
-                        id="roomCode"
-                        className="form-input"
-                        value={roomCode}
-                        onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
-                        required
-                        disabled={loading}
-                    />
+                    <div className="input-with-icon">
+                        <KeyRound size={18} aria-hidden="true" />
+                        <input
+                            type="text"
+                            id="roomCode"
+                            className="form-input"
+                            value={roomCode}
+                            onChange={(e) => setRoomCode(e.target.value.toUpperCase())}
+                            required
+                            disabled={loading}
+                        />
+                    </div>
                 </div>
                 <div className="form-group">
                     <label htmlFor="userName">{t('label_your_name')}</label>
-                    <input
-                        type="text"
-                        id="userName"
-                        className="form-input"
-                        value={userName}
-                        onChange={(e) => setUserName(e.target.value)}
-                        required
-                        disabled={loading}
-                    />
+                    <div className="input-with-icon">
+                        <User size={18} aria-hidden="true" />
+                        <input
+                            type="text"
+                            id="userName"
+                            className="form-input"
+                            value={userName}
+                            onChange={(e) => setUserName(e.target.value)}
+                            required
+                            disabled={loading}
+                        />
+                    </div>
                 </div>
-                <button type="submit" disabled={loading} className="form-submit-btn">
+                <button type="submit" disabled={loading} className="form-submit-btn btn-with-icon">
                     {loading ? t('btn_joining') : t('btn_join')}
+                    <ArrowRight size={18} aria-hidden="true" />
                 </button>
             </form>
             {/* Display local form errors or context errors */}

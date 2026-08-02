@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { X } from 'lucide-react';
 import './Modal.css';
 
 interface ModalProps {
@@ -36,7 +37,7 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, title, children, footer 
         <div className="modal-overlay" onClick={handleBackdropClick}>
             <div className="modal-content" role="dialog" aria-modal="true">
                 <button className="modal-close-btn" onClick={onClose} aria-label="Close">
-                    &times;
+                    <X size={20} />
                 </button>
 
                 {title && (

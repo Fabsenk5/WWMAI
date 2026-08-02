@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { LogIn, Mail, Lock } from 'lucide-react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import '../styles/Forms.css';
+import './AuthPages.css';
 import { API_BASE_URL } from '../config/api';
 
 const LoginPage: React.FC = () => {
@@ -33,27 +35,36 @@ const LoginPage: React.FC = () => {
             <form onSubmit={handleSubmit}>
                 <div className="form-group">
                     <label>Email</label>
-                    <input
-                        type="email"
-                        className="form-input"
-                        value={email}
-                        onChange={(e) => setEmail(e.target.value)}
-                        required
-                    />
+                    <div className="input-with-icon">
+                        <Mail size={18} aria-hidden="true" />
+                        <input
+                            type="email"
+                            className="form-input"
+                            value={email}
+                            onChange={(e) => setEmail(e.target.value)}
+                            required
+                        />
+                    </div>
                 </div>
                 <div className="form-group">
                     <label>Password</label>
-                    <input
-                        type="password"
-                        className="form-input"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        required
-                    />
+                    <div className="input-with-icon">
+                        <Lock size={18} aria-hidden="true" />
+                        <input
+                            type="password"
+                            className="form-input"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            required
+                        />
+                    </div>
                 </div>
-                <button type="submit" className="form-submit-btn btn-primary">Login</button>
+                <button type="submit" className="form-submit-btn btn-primary btn-with-icon">
+                    <LogIn size={18} aria-hidden="true" />
+                    Login
+                </button>
             </form>
-            <p style={{ marginTop: '20px' }}>
+            <p className="form-footer">
                 Don't have an account? <Link to="/register">Register here</Link>
             </p>
         </div>

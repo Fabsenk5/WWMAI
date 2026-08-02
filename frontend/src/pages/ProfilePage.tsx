@@ -2,8 +2,10 @@ import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { Link } from 'react-router-dom'; // Import Link
 import '../styles/Forms.css';
+import '../pages/ProfilePage.css';
 import { API_BASE_URL } from '../config/api';
 import FeatureWishlistButton from '../components/FeatureWishlistButton';
+import { Crown, Flame, Trophy, Pencil, LogOut } from 'lucide-react';
 
 const ProfilePage: React.FC = () => {
     const { user, logout, token, login } = useAuth(); // Need token and login to update local state
@@ -53,19 +55,25 @@ const ProfilePage: React.FC = () => {
 
     return (
         <div className="form-page-container">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <h1 style={{ margin: 0 }}>My Profile</h1>
+            <div className="profile-header">
+                <h1>My Profile</h1>
                 <FeatureWishlistButton />
             </div>
-            <div style={{ textAlign: 'left', marginBottom: '20px' }}>
+            <div className="profile-info">
                 <p><strong>Username:</strong> {user.username}</p>
                 <p><strong>Email:</strong> {user.email}</p>
-                <p><strong>Status:</strong> <span style={{ color: user.subscription_status === 'premium' ? 'gold' : 'inherit' }}>{user.subscription_status.toUpperCase()}</span></p>
+                <p><strong>Status:</strong>{' '}
+                    {user.subscription_status === 'premium' ? (
+                        <span className="premium-badge"><Crown size={14} /> {user.subscription_status.toUpperCase()}</span>
+                    ) : (
+                        <span className="status-badge">{user.subscription_status.toUpperCase()}</span>
+                    )}
+                </p>
 
                 {user.subscription_status === 'free' && (
-                    <div style={{ marginTop: '20px' }}>
+                    <div className="profile-upgrade-wrap">
                         <Link to="/upgrade">
-                            <button className="form-submit-btn" style={{ background: 'linear-gradient(45deg, #FFD700, #FFA500)', color: 'black', fontWeight: 'bold' }}>
+                            <button className="form-submit-btn premium-cta">
                                 Upgrade to Premium
                             </button>
                         </Link>
@@ -73,46 +81,46 @@ const ProfilePage: React.FC = () => {
                 )}
 
                 {/* Player Statistics */}
-                <div style={{ marginTop: '20px', padding: '15px', background: 'rgba(255,255,255,0.05)', borderRadius: '8px', border: '1px solid rgba(255,255,255,0.1)' }}>
-                    <h3 style={{ marginTop: 0, marginBottom: '15px', borderBottom: '1px solid #444', paddingBottom: '5px' }}>Player Statistics</h3>
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '15px' }}>
-                        <div>
-                            <div style={{ fontSize: '0.8em', color: '#aaa' }}>Games Played</div>
-                            <div style={{ fontSize: '1.2em', fontWeight: 'bold' }}>{user.games_played || 0}</div>
+                <div className="profile-section">
+                    <h3 className="profile-section-title">Player Statistics</h3>
+                    <div className="profile-stats-grid">
+                        <div className="stat-card">
+                            <div className="stat-label">Games Played</div>
+                            <div className="stat-value">{user.games_played || 0}</div>
                         </div>
-                        <div>
-                            <div style={{ fontSize: '0.8em', color: '#aaa' }}>Games Won</div>
-                            <div style={{ fontSize: '1.2em', fontWeight: 'bold' }}>{user.games_won || 0}</div>
+                        <div className="stat-card">
+                            <div className="stat-label">Games Won</div>
+                            <div className="stat-value">{user.games_won || 0}</div>
                         </div>
-                        <div>
-                            <div style={{ fontSize: '0.8em', color: '#aaa' }}>Win Rate</div>
-                            <div style={{ fontSize: '1.2em', fontWeight: 'bold' }}>
+                        <div className="stat-card">
+                            <div className="stat-label">Win Rate</div>
+                            <div className="stat-value">
                                 {user.games_played ? ((user.games_won || 0) / user.games_played * 100).toFixed(1) : '0.0'}%
                             </div>
                         </div>
-                        <div>
-                            <div style={{ fontSize: '0.8em', color: '#aaa' }}>Total Earnings</div>
-                            <div style={{ fontSize: '1.2em', fontWeight: 'bold', color: '#4caf50' }}>
+                        <div className="stat-card">
+                            <div className="stat-label">Total Earnings</div>
+                            <div className="stat-value stat-value-gold">
                                 €{(user.total_earnings || 0).toLocaleString('de-DE')}
                             </div>
                         </div>
-                        <div>
-                            <div style={{ fontSize: '0.8em', color: '#aaa' }}>Current Streak</div>
-                            <div style={{ fontSize: '1.2em', fontWeight: 'bold' }}>{user.current_win_streak || 0} 🔥</div>
+                        <div className="stat-card">
+                            <div className="stat-label">Current Streak</div>
+                            <div className="stat-value"><Flame className="stat-icon" size={16} />{user.current_win_streak || 0}</div>
                         </div>
-                        <div>
-                            <div style={{ fontSize: '0.8em', color: '#aaa' }}>Best Streak</div>
-                            <div style={{ fontSize: '1.2em', fontWeight: 'bold' }}>{user.longest_win_streak || 0} 🏆</div>
+                        <div className="stat-card">
+                            <div className="stat-label">Best Streak</div>
+                            <div className="stat-value"><Trophy className="stat-icon" size={16} />{user.longest_win_streak || 0}</div>
                         </div>
-                        <div>
-                            <div style={{ fontSize: '0.8em', color: '#aaa' }}>Best Category</div>
-                            <div style={{ fontSize: '1.0em', fontWeight: 'bold', color: '#ffd700' }}>
+                        <div className="stat-card">
+                            <div className="stat-label">Best Category</div>
+                            <div className="stat-value stat-value-gold">
                                 {user.best_category ? `${user.best_category.category} (${user.best_category.count})` : '-'}
                             </div>
                         </div>
-                        <div>
-                            <div style={{ fontSize: '0.8em', color: '#aaa' }}>Worst Category</div>
-                            <div style={{ fontSize: '1.0em', fontWeight: 'bold', color: '#ff6b6b' }}>
+                        <div className="stat-card">
+                            <div className="stat-label">Worst Category</div>
+                            <div className="stat-value stat-value-danger">
                                 {user.worst_category ? `${user.worst_category.category} (${user.worst_category.count})` : '-'}
                             </div>
                         </div>
@@ -120,17 +128,19 @@ const ProfilePage: React.FC = () => {
                 </div>
 
                 {/* Avatar Display */}
-                <div style={{ marginTop: '20px' }}>
-                    {user.avatar_url ? (
-                        <img src={user.avatar_url} alt="Avatar" style={{ width: '100px', height: '100px', borderRadius: '50%', objectFit: 'cover' }} />
-                    ) : (
-                        <div style={{ width: '100px', height: '100px', borderRadius: '50%', background: '#444', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>No Avatar</div>
-                    )}
+                <div className="profile-avatar-wrap">
+                    <div className="profile-avatar">
+                        {user.avatar_url ? (
+                            <img src={user.avatar_url} alt="Avatar" />
+                        ) : (
+                            <span className="profile-avatar-fallback">{user.username.charAt(0).toUpperCase()}</span>
+                        )}
+                    </div>
                 </div>
 
                 {/* Edit Form */}
                 {isEditing ? (
-                    <div style={{ marginTop: '20px', padding: '15px', background: '#2a2a2a', borderRadius: '8px' }}>
+                    <div className="profile-section">
                         <div className="form-group">
                             <label>Username:</label>
                             <input className="form-input" value={editName} onChange={e => setEditName(e.target.value)} />
@@ -139,24 +149,25 @@ const ProfilePage: React.FC = () => {
                             <label>Avatar URL:</label>
                             <input className="form-input" value={editAvatar} onChange={e => setEditAvatar(e.target.value)} placeholder="https://..." />
                         </div>
-                        <div style={{ display: 'flex', gap: '10px', marginTop: '10px' }}>
+                        <div className="profile-actions">
                             <button onClick={handleUpdate} className="form-submit-btn">Save</button>
-                            <button onClick={() => setIsEditing(false)} className="form-submit-btn" style={{ background: '#555' }}>Cancel</button>
+                            <button onClick={() => setIsEditing(false)} className="btn-secondary">Cancel</button>
                         </div>
                     </div>
                 ) : (
-                    <button onClick={() => setIsEditing(true)} style={{ marginTop: '20px', padding: '5px 10px', cursor: 'pointer' }}>Edit Profile</button>
+                    <button onClick={() => setIsEditing(true)} className="btn-secondary profile-edit-btn">
+                        <Pencil size={16} /> Edit Profile
+                    </button>
                 )}
-                {msg && <p style={{ color: msg.includes('failed') || msg.includes('Error') ? 'red' : 'lightgreen' }}>{msg}</p>}
+                {msg && <p className={msg.includes('failed') || msg.includes('Error') ? 'text-danger' : 'text-success'}>{msg}</p>}
 
             </div>
 
             <button
                 onClick={logout}
-                className="form-submit-btn"
-                style={{ backgroundColor: 'var(--danger-color)', border: 'none' }}
+                className="form-submit-btn profile-logout-btn"
             >
-                Logout
+                <LogOut size={16} /> Logout
             </button>
         </div>
     );

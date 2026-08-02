@@ -1,0 +1,24 @@
+/* CreateGamePage-specific styles (built on App.css/Forms.css tokens) */
+
+.create-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.premium-lock {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    margin-left: 10px;
+    font-size: 0.8em;
+    font-weight: 600;
+    color: var(--accent-color);
+    letter-spacing: 0.3px;
+}
+
+.upgrade-link {
+    text-decoration: underline;
+    text-underline-offset: 2px;
+}

@@ -21,6 +21,8 @@ import {
 } from '../services/adminService';
 import '../styles/Forms.css';
 import '../styles/App.css';
+import './AdminDashboard.css';
+import { RefreshCw, Ban, FolderArchive, Check, LogOut } from 'lucide-react';
 
 const AdminDashboard: React.FC = () => {
     const navigate = useNavigate();
@@ -299,19 +301,18 @@ const AdminDashboard: React.FC = () => {
     };
 
     return (
-        <div style={{ maxWidth: '1200px', margin: '0 auto', padding: '20px', color: 'var(--text-primary)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+        <div className="admin-dashboard-container">
+            <div className="admin-header">
                 <h1>Admin Dashboard</h1>
                 <button
                     onClick={() => { localStorage.removeItem('adminPassword'); navigate('/'); }}
-                    className="btn"
-                    style={{ backgroundColor: 'var(--danger-color)' }}
+                    className="btn btn-danger"
                 >
-                    Logout
+                    <LogOut size={14} /> Logout
                 </button>
             </div>
 
-            <div style={{ display: 'flex', gap: '10px', marginBottom: '20px' }}>
+            <div className="admin-tabs">
                 <button
                     className={`btn ${activeTab === 'categories' ? 'btn-primary' : 'btn-secondary'}`}
                     style={{ opacity: activeTab === 'categories' ? 1 : 0.7 }}
@@ -343,20 +344,18 @@ const AdminDashboard: React.FC = () => {
             </div>
 
             {/* Contextual Global Controls */}
-            <div style={{ marginBottom: '20px', display: 'flex', gap: '10px', justifyContent: 'flex-end' }}>
+            <div className="admin-actions">
                 <button
                     className="btn btn-primary"
-                    style={{ backgroundColor: 'var(--primary-color)' }}
                     onClick={handleRegenerate}
                 >
-                    🔄 Archive & Regenerate All
+                    <RefreshCw size={14} /> Archive & Regenerate All
                 </button>
                 <button
-                    className="btn"
-                    style={{ backgroundColor: 'var(--danger-color)' }}
+                    className="btn btn-danger"
                     onClick={() => handleUpdateAllStatus(false)}
                 >
-                    ⚠️ Archive ALL
+                    <Ban size={14} /> Archive ALL
                 </button>
             </div>
 
@@ -368,44 +367,40 @@ const AdminDashboard: React.FC = () => {
                             Select categories to remove ALL associated questions from the database.
                         </p>
 
-                        <div className="categories-grid" style={{ maxHeight: '400px', overflowY: 'auto', padding: '10px', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)' }}>
+                        <div className="categories-grid admin-categories-box">
                             {categories.map(category => (
                                 <div
                                     key={category}
-                                    style={{ display: 'flex', alignItems: 'center', gap: '5px', marginBottom: '5px' }}
+                                    className="admin-category-row"
                                 >
                                     <div
                                         className={`category-chip ${selectedCategories.includes(category) ? 'selected' : ''}`}
                                         onClick={() => handleCategoryToggle(category)}
-                                        style={{ flex: 1 }}
                                     >
                                         {category}
                                     </div>
                                     <button
-                                        className="btn small-btn"
+                                        className="btn small-btn admin-icon-btn admin-icon-btn-neutral"
                                         title="Archive All in Category"
-                                        style={{ padding: '2px 5px', fontSize: '10px', backgroundColor: 'var(--text-secondary)' }}
                                         onClick={() => handleUpdateCategoryStatus(category, false)}
                                     >
-                                        📁
+                                        <FolderArchive size={12} />
                                     </button>
                                     <button
-                                        className="btn small-btn"
+                                        className="btn small-btn admin-icon-btn admin-icon-btn-success"
                                         title="Activate All in Category"
-                                        style={{ padding: '2px 5px', fontSize: '10px', backgroundColor: 'var(--success-color)' }}
                                         onClick={() => handleUpdateCategoryStatus(category, true)}
                                     >
-                                        ✅
+                                        <Check size={12} />
                                     </button>
                                 </div>
                             ))}
                         </div>
 
-                        {deleteMessage && <div className={`error-message ${deleteMessage.includes('Success') ? 'success' : ''}`} style={{ borderColor: deleteMessage.includes('Success') ? 'var(--success-color)' : '' }}>{deleteMessage}</div>}
+                        {deleteMessage && <div className={`error-message ${deleteMessage.includes('Success') ? 'success' : ''}`}>{deleteMessage}</div>}
 
                         <button
-                            className="btn form-submit-btn"
-                            style={{ backgroundColor: 'var(--danger-color)', marginTop: '20px' }}
+                            className="btn btn-danger admin-delete-btn"
                             disabled={selectedCategories.length === 0}
                             onClick={handleDeleteCategories}
                         >
@@ -417,9 +412,9 @@ const AdminDashboard: React.FC = () => {
                 {activeTab === 'questions' && (
                     <div>
                         <h2>Question Explorer</h2>
-                        <div style={{ display: 'flex', gap: '10px', marginBottom: '20px', flexWrap: 'wrap' }}>
-                            <div style={{ flex: 1 }}>
-                                <label style={{ display: 'block', marginBottom: '5px' }}>Filter by Category</label>
+                        <div className="admin-filters">
+                            <div className="admin-filter-field">
+                                <label className="admin-filter-label">Filter by Category</label>
                                 <select
                                     className="form-select"
                                     value={filterCategory}
@@ -429,8 +424,8 @@ const AdminDashboard: React.FC = () => {
                                     {categories.map(c => <option key={c} value={c}>{c}</option>)}
                                 </select>
                             </div>
-                            <div style={{ flex: 1 }}>
-                                <label style={{ display: 'block', marginBottom: '5px' }}>Filter by Difficulty</label>
+                            <div className="admin-filter-field">
+                                <label className="admin-filter-label">Filter by Difficulty</label>
                                 <select
                                     className="form-select"
                                     value={filterDifficulty}
@@ -443,8 +438,8 @@ const AdminDashboard: React.FC = () => {
                                     <option value="very_hard">Very Hard</option>
                                 </select>
                             </div>
-                            <div style={{ flex: 1 }}>
-                                <label style={{ display: 'block', marginBottom: '5px' }}>Filter by Status</label>
+                            <div className="admin-filter-field">
+                                <label className="admin-filter-label">Filter by Status</label>
                                 <select
                                     className="form-select"
                                     value={filterStatus}
@@ -457,17 +452,17 @@ const AdminDashboard: React.FC = () => {
                             </div>
                         </div>
 
-                        <div style={{ overflowX: 'auto' }}>
-                            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                        <div className="admin-table-wrap">
+                            <table className="admin-table">
                                 <thead>
-                                    <tr style={{ borderBottom: '2px solid var(--border-color)' }}>
-                                        <th style={{ padding: '10px' }}>ID</th>
-                                        <th style={{ padding: '10px' }}>Category</th>
-                                        <th style={{ padding: '10px' }}>Diff</th>
-                                        <th style={{ padding: '10px' }}>Question</th>
-                                        <th style={{ padding: '10px' }}>Correct Answer</th>
-                                        <th style={{ padding: '10px' }}>Status</th>
-                                        <th style={{ padding: '10px' }}>Action</th>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Category</th>
+                                        <th>Diff</th>
+                                        <th>Question</th>
+                                        <th>Correct Answer</th>
+                                        <th>Status</th>
+                                        <th>Action</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -477,24 +472,18 @@ const AdminDashboard: React.FC = () => {
                                         <tr><td colSpan={6} style={{ padding: '20px', textAlign: 'center' }}>No questions found</td></tr>
                                     ) : (
                                         questions.map(q => (
-                                            <tr key={q.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                                                <td style={{ padding: '10px' }}>{q.id}</td>
-                                                <td style={{ padding: '10px' }}>
-                                                    <span style={{ fontSize: '0.8em', padding: '2px 6px', borderRadius: '4px', backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-color)' }}>
+                                            <tr key={q.id}>
+                                                <td>{q.id}</td>
+                                                <td>
+                                                    <span className="admin-category-tag">
                                                         {q.category}
                                                     </span>
                                                 </td>
-                                                <td style={{ padding: '10px' }}>
+                                                <td>
                                                     <select
                                                         value={q.difficulty}
                                                         onChange={(e) => handleUpdateDifficulty(q.id, e.target.value)}
-                                                        style={{
-                                                            padding: '4px',
-                                                            borderRadius: '4px',
-                                                            border: '1px solid var(--border-color)',
-                                                            backgroundColor: 'var(--bg-secondary)',
-                                                            color: 'var(--text-primary)'
-                                                        }}
+                                                        className="admin-difficulty-select"
                                                         onClick={(e) => e.stopPropagation()}
                                                     >
                                                         <option value="easy">Easy</option>
@@ -503,27 +492,20 @@ const AdminDashboard: React.FC = () => {
                                                         <option value="very_hard">Very Hard</option>
                                                     </select>
                                                 </td>
-                                                <td style={{ padding: '10px' }}>{q.text}</td>
-                                                <td style={{ padding: '10px' }}>{q.correctAnswer}</td>
-                                                <td style={{ padding: '10px' }}>
-                                                    <span style={{
-                                                        color: q.is_active ? 'var(--success-color)' : 'var(--text-secondary)',
-                                                        fontWeight: 'bold'
+                                                <td>{q.text}</td>
+                                                <td>{q.correctAnswer}</td>
+                                                <td>
+                                                    <span className="admin-status-text" style={{
+                                                        color: q.is_active ? 'var(--success-color)' : 'var(--text-secondary)'
                                                     }}>
                                                         {q.is_active ? 'ACTIVE' : 'ARCHIVED'}
                                                     </span>
                                                 </td>
-                                                <td style={{ padding: '10px' }}>
+                                                <td>
                                                     <button
-                                                        className="btn"
+                                                        className="btn admin-action-btn"
                                                         style={{
-                                                            padding: '4px 8px',
-                                                            fontSize: '0.8rem',
                                                             backgroundColor: q.is_active ? 'gray' : 'var(--success-color)',
-                                                            color: 'white',
-                                                            border: 'none',
-                                                            borderRadius: '4px',
-                                                            cursor: 'pointer',
                                                             marginRight: '5px'
                                                         }}
                                                         onClick={() => handleUpdateQuestionStatus(q.id, !q.is_active)}
@@ -531,16 +513,7 @@ const AdminDashboard: React.FC = () => {
                                                         {q.is_active ? 'Archive' : 'Activate'}
                                                     </button>
                                                     <button
-                                                        className="btn"
-                                                        style={{
-                                                            padding: '4px 8px',
-                                                            fontSize: '0.8rem',
-                                                            backgroundColor: 'var(--danger-color)',
-                                                            color: 'white',
-                                                            border: 'none',
-                                                            borderRadius: '4px',
-                                                            cursor: 'pointer'
-                                                        }}
+                                                        className="btn btn-danger admin-action-btn"
                                                         onClick={() => handleDeleteQuestion(q.id)}
                                                     >
                                                         Delete
@@ -553,7 +526,7 @@ const AdminDashboard: React.FC = () => {
                             </table>
                         </div>
 
-                        <div style={{ marginTop: '20px', display: 'flex', justifyContent: 'center', gap: '10px', alignItems: 'center' }}>
+                        <div className="admin-pagination">
                             <button
                                 className="btn btn-secondary"
                                 disabled={page <= 1}
@@ -578,24 +551,21 @@ const AdminDashboard: React.FC = () => {
                         <h2>User Management</h2>
                         {userMessage && (
                             <div className={`error-message ${userMessage.includes('Failed') ? '' : 'success'}`}
-                                style={{
-                                    borderColor: userMessage.includes('Failed') ? 'var(--danger-color)' : 'var(--success-color)',
-                                    marginBottom: '20px'
-                                }}>
+                                style={{ marginBottom: '20px' }}>
                                 {userMessage}
                             </div>
                         )}
 
-                        <div style={{ overflowX: 'auto' }}>
-                            <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                        <div className="admin-table-wrap">
+                            <table className="admin-table">
                                 <thead>
-                                    <tr style={{ borderBottom: '2px solid var(--border-color)' }}>
-                                        <th style={{ padding: '10px' }}>ID</th>
-                                        <th style={{ padding: '10px' }}>Username</th>
-                                        <th style={{ padding: '10px' }}>Email</th>
-                                        <th style={{ padding: '10px' }}>Status</th>
-                                        <th style={{ padding: '10px' }}>Expiry</th>
-                                        <th style={{ padding: '10px' }}>Actions</th>
+                                    <tr>
+                                        <th>ID</th>
+                                        <th>Username</th>
+                                        <th>Email</th>
+                                        <th>Status</th>
+                                        <th>Expiry</th>
+                                        <th>Actions</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -605,51 +575,37 @@ const AdminDashboard: React.FC = () => {
                                         <tr><td colSpan={6} style={{ padding: '20px', textAlign: 'center' }}>No users found</td></tr>
                                     ) : (
                                         users.map(user => (
-                                            <tr key={user.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                                                <td style={{ padding: '10px' }}>{user.id}</td>
-                                                <td style={{ padding: '10px' }}>{user.username}</td>
-                                                <td style={{ padding: '10px' }}>{user.email}</td>
-                                                <td style={{ padding: '10px' }}>
-                                                    <span style={{
-                                                        padding: '4px 8px',
-                                                        borderRadius: '4px',
-                                                        backgroundColor: user.subscription_status === 'premium' ? 'var(--primary-color)' : 'var(--bg-secondary)',
-                                                        color: user.subscription_status === 'premium' ? 'white' : 'var(--text-primary)',
-                                                        fontSize: '0.8em'
-                                                    }}>
+                                            <tr key={user.id}>
+                                                <td>{user.id}</td>
+                                                <td>{user.username}</td>
+                                                <td>{user.email}</td>
+                                                <td>
+                                                    <span className={`admin-user-badge ${user.subscription_status === 'premium' ? 'premium' : ''}`}>
                                                         {user.subscription_status.toUpperCase()}
                                                     </span>
                                                 </td>
-                                                <td style={{ padding: '10px' }}>
+                                                <td>
                                                     {user.subscription_end_date ? new Date(user.subscription_end_date).toLocaleDateString() : 'N/A'}
                                                 </td>
-                                                <td style={{ padding: '10px', display: 'flex', gap: '10px' }}>
-                                                    <button
-                                                        className="btn"
-                                                        style={{
-                                                            padding: '4px 8px',
-                                                            fontSize: '0.8rem',
-                                                            backgroundColor: user.subscription_status === 'premium' ? 'var(--bg-secondary)' : 'var(--success-color)',
-                                                            color: user.subscription_status === 'premium' ? 'var(--text-primary)' : 'white',
-                                                            border: '1px solid var(--border-color)',
-                                                        }}
-                                                        onClick={() => handleUpdateUserStatus(user)}
-                                                    >
-                                                        {user.subscription_status === 'premium' ? 'Revert to Free' : 'Make Premium'}
-                                                    </button>
-                                                    <button
-                                                        className="btn"
-                                                        style={{
-                                                            padding: '4px 8px',
-                                                            fontSize: '0.8rem',
-                                                            backgroundColor: 'var(--danger-color)',
-                                                            color: 'white',
-                                                            border: 'none',
-                                                        }}
-                                                        onClick={() => handleDeleteUser(user)}
-                                                    >
-                                                        Delete
-                                                    </button>
+                                                <td>
+                                                    <div style={{ display: 'flex', gap: '10px' }}>
+                                                        <button
+                                                            className="btn admin-action-btn"
+                                                            style={{
+                                                                backgroundColor: user.subscription_status === 'premium' ? 'var(--bg-secondary)' : 'var(--success-color)',
+                                                                color: user.subscription_status === 'premium' ? 'var(--text-primary)' : 'white'
+                                                            }}
+                                                            onClick={() => handleUpdateUserStatus(user)}
+                                                        >
+                                                            {user.subscription_status === 'premium' ? 'Revert to Free' : 'Make Premium'}
+                                                        </button>
+                                                        <button
+                                                            className="btn btn-danger admin-action-btn"
+                                                            onClick={() => handleDeleteUser(user)}
+                                                        >
+                                                            Delete
+                                                        </button>
+                                                    </div>
                                                 </td>
                                             </tr>
                                         ))
@@ -663,68 +619,51 @@ const AdminDashboard: React.FC = () => {
                 {activeTab === 'settings' && (
                     <div>
                         <h2>Global Settings</h2>
-                        <div style={{
-                            padding: '20px',
-                            border: '1px solid var(--border-color)',
-                            borderRadius: 'var(--radius-sm)',
-                            backgroundColor: 'var(--bg-secondary)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between'
-                        }}>
+                        <div className="admin-section">
                             <div>
-                                <h3 style={{ margin: '0 0 10px 0' }}>Unlock Premium Features</h3>
-                                <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
+                                <h3>Unlock Premium Features</h3>
+                                <p>
                                     When enabled, ALL users (including free tier) will have access to premium features.
                                 </p>
                             </div>
                             <div className="toggle-switch">
-                                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '10px' }}>
+                                <label>
                                     <input
                                         type="checkbox"
                                         checked={globalPremiumUnlocked}
                                         onChange={() => handleToggleGlobalPremium('user')}
-                                        style={{ accentColor: 'var(--primary-color)', transform: 'scale(1.5)' }}
                                     />
-                                    <span style={{ fontWeight: 'bold' }}>
+                                    <span className="toggle-knob" aria-hidden="true" />
+                                    <span className="toggle-status">
                                         {globalPremiumUnlocked ? 'UNLOCKED' : 'LOCKED'}
                                     </span>
                                 </label>
                             </div>
                         </div>
 
-                        <div style={{
-                            padding: '20px',
-                            border: '1px solid var(--border-color)',
-                            borderRadius: 'var(--radius-sm)',
-                            backgroundColor: 'var(--bg-secondary)',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            marginTop: '20px'
-                        }}>
+                        <div className="admin-section">
                             <div>
-                                <h3 style={{ margin: '0 0 10px 0' }}>Unlock Premium for GUESTS</h3>
-                                <p style={{ margin: 0, color: 'var(--text-secondary)' }}>
+                                <h3>Unlock Premium for GUESTS</h3>
+                                <p>
                                     When enabled, GUESTS (non-logged-in users) will have access to premium features like Custom Topics.
                                 </p>
                             </div>
                             <div className="toggle-switch">
-                                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer', gap: '10px' }}>
+                                <label>
                                     <input
                                         type="checkbox"
                                         checked={globalGuestPremiumUnlocked}
                                         onChange={() => handleToggleGlobalPremium('guest')}
-                                        style={{ accentColor: 'var(--secondary-color)', transform: 'scale(1.5)' }}
                                     />
-                                    <span style={{ fontWeight: 'bold' }}>
+                                    <span className="toggle-knob" aria-hidden="true" />
+                                    <span className="toggle-status">
                                         {globalGuestPremiumUnlocked ? 'UNLOCKED' : 'LOCKED'}
                                     </span>
                                 </label>
                             </div>
                         </div>
                         {settingsMessage && (
-                            <div className="error-message success" style={{ marginTop: '20px', borderColor: 'var(--success-color)' }}>
+                            <div className="error-message success" style={{ marginTop: '20px' }}>
                                 {settingsMessage}
                             </div>
                         )}

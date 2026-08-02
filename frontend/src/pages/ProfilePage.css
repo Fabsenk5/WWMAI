@@ -1,0 +1,204 @@
+/* ProfilePage.css — built on the App.css design tokens */
+
+.profile-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.profile-header h1 {
+    margin: 0;
+}
+
+.profile-info {
+    text-align: left;
+    margin-bottom: 20px;
+}
+
+.profile-info p {
+    margin: 6px 0;
+}
+
+.status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    background: var(--bg-inset);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-full);
+    font-size: 0.85em;
+    font-weight: 700;
+    letter-spacing: 0.8px;
+    color: var(--text-secondary);
+}
+
+.premium-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 12px;
+    background: var(--grad-gold);
+    border: 1px solid transparent;
+    border-radius: var(--radius-full);
+    box-shadow: var(--shadow-gold);
+    font-size: 0.85em;
+    font-weight: 800;
+    letter-spacing: 0.8px;
+    color: var(--text-inverse);
+}
+
+.profile-upgrade-wrap {
+    margin-top: 20px;
+}
+
+.premium-cta {
+    position: relative;
+    overflow: hidden;
+    font-weight: 800;
+    color: var(--text-inverse);
+}
+
+.premium-cta::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -75%;
+    width: 50%;
+    height: 100%;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+    transform: skewX(-20deg);
+    animation: premiumShine 3s ease-in-out infinite;
+}
+
+@keyframes premiumShine {
+    0%, 60% { left: -75%; }
+    100% { left: 125%; }
+}
+
+.profile-section {
+    margin-top: 20px;
+    padding: 18px;
+    background: var(--bg-card);
+    background-image: var(--grad-card);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    box-shadow: var(--shadow-sm);
+}
+
+.profile-section-title {
+    margin: 0 0 15px 0;
+    padding-bottom: 5px;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.profile-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+    gap: 15px;
+}
+
+.stat-card {
+    background: var(--bg-inset);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-sm);
+    padding: 12px;
+}
+
+.stat-label {
+    font-size: 0.8em;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    color: var(--text-muted);
+}
+
+.stat-value {
+    margin-top: 4px;
+    font-size: 1.2em;
+    font-weight: bold;
+    color: var(--text-primary);
+}
+
+.stat-value-gold {
+    color: var(--accent-color);
+}
+
+.stat-value-danger {
+    color: var(--danger-color);
+}
+
+.stat-icon {
+    display: inline-block;
+    vertical-align: -2px;
+    margin-right: 4px;
+    color: var(--accent-color);
+}
+
+.profile-avatar-wrap {
+    margin-top: 20px;
+}
+
+.profile-avatar {
+    width: 100px;
+    height: 100px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 2px solid var(--accent-color);
+    box-shadow: var(--shadow-gold);
+    background: var(--accent-soft);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.profile-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.profile-avatar-fallback {
+    font-family: var(--font-display);
+    font-size: 2.5rem;
+    font-weight: 800;
+    color: var(--accent-color);
+}
+
+.profile-edit-btn {
+    margin-top: 20px;
+    padding: 8px 16px;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.profile-actions {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.profile-actions .form-submit-btn,
+.profile-actions .btn-secondary {
+    flex: 1;
+    width: auto;
+}
+
+.profile-logout-btn {
+    background: var(--danger-color);
+    box-shadow: 0 4px 18px rgba(246, 83, 79, 0.3);
+}
+
+.profile-logout-btn:hover:not(:disabled) {
+    filter: brightness(1.1);
+    box-shadow: 0 8px 28px rgba(246, 83, 79, 0.4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .premium-cta::after {
+        animation: none;
+    }
+}

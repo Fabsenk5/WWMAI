@@ -1,8 +1,10 @@
 
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Shield, Lock, LogIn } from 'lucide-react';
 import { verifyPassword } from '../services/adminService';
 import '../styles/Forms.css'; // Reusing existing styles
+import './AuthPages.css';
 
 const AdminLogin: React.FC = () => {
     const [password, setPassword] = useState('');
@@ -28,21 +30,30 @@ const AdminLogin: React.FC = () => {
 
     return (
         <div className="form-page-container">
-            <h1>Admin Login</h1>
+            <h1>
+                <Shield size={26} aria-hidden="true" />
+                Admin Login
+            </h1>
             <form onSubmit={handleSubmit}>
                 <div className="form-group">
                     <label htmlFor="password">Password</label>
-                    <input
-                        type="password"
-                        id="password"
-                        className="form-input"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        placeholder="Enter admin password"
-                    />
+                    <div className="input-with-icon">
+                        <Lock size={18} aria-hidden="true" />
+                        <input
+                            type="password"
+                            id="password"
+                            className="form-input"
+                            value={password}
+                            onChange={(e) => setPassword(e.target.value)}
+                            placeholder="Enter admin password"
+                        />
+                    </div>
                 </div>
                 {error && <div className="error-message">{error}</div>}
-                <button type="submit" className="btn form-submit-btn">Login</button>
+                <button type="submit" className="btn form-submit-btn btn-with-icon">
+                    <LogIn size={18} aria-hidden="true" />
+                    Login
+                </button>
             </form>
         </div>
     );

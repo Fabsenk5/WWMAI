@@ -8,6 +8,7 @@ import { useModal } from '../context/ModalContext';
 import { useAudio } from '../context/AudioContext';
 import io, { Socket } from 'socket.io-client';
 import axios from 'axios';
+import { Heart, Skull, Trophy, Split, Users, Phone, UserX, CheckCircle2, XCircle, EyeOff } from 'lucide-react';
 import './LobbyPage.css'; // Import the new CSS file
 import { API_BASE_URL } from '../config/api';
 
@@ -460,14 +461,14 @@ const LobbyPage: React.FC = () => {
       <header className="lobby-header">
         <h1>{gameData?.game_mode === 'survival' ? t('game_mode_survival') : t('game_mode_coop')}</h1>
         {gameData?.game_mode !== 'survival' && (
-          <div className={`lobby-lives ${(gameData?.lives || 0) > 1 ? 'text-success' : 'text-danger'}`}>
-            {t('team_lives')}: {gameData?.lives ?? 3} ❤️
+          <div className={`lobby-lives ${(gameData?.lives || 0) > 1 ? 'text-success' : 'text-danger'} ${(gameData?.lives ?? 3) <= 1 ? 'lives-low' : ''}`}>
+            <Heart size={18} fill="currentColor" /> {t('team_lives')}: {gameData?.lives ?? 3}
           </div>
         )}
       </header>
 
       <div className="lobby-room-info">
-        <strong>{t('room')}:</strong> {roomCode} | <strong>{t('level')}:</strong> {gameData?.current_level ?? 0}
+        <strong>{t('room')}:</strong> <span className="lobby-room-code">{roomCode}</span> | <strong>{t('level')}:</strong> {gameData?.current_level ?? 0}
       </div>
 
       {waitingForCount && !revealedAnswers && (
@@ -484,7 +485,9 @@ const LobbyPage: React.FC = () => {
             <>
               <div className={`game-over-banner ${gameResult}`}>
                 <div className="game-over-title">
-                  {gameResult === 'victory' ? '🏆 VICTORY! 🏆' : '💀 GAME OVER 💀'}
+                  {gameResult === 'victory'
+                    ? <><Trophy size={34} /> VICTORY! <Trophy size={34} /></>
+                    : <><Skull size={34} /> GAME OVER <Skull size={34} /></>}
                 </div>
                 <div className="game-over-text">
                   {gameResult === 'victory'
@@ -569,7 +572,7 @@ const LobbyPage: React.FC = () => {
 
                 return (
                   <div className="result-value">
-                    {prefix}{displayText} {isCorrect ? ' ✅' : ' ❌'}
+                    <span>{prefix}{displayText}</span>{isCorrect ? <CheckCircle2 className="result-icon correct" size={22} /> : <XCircle className="result-icon wrong" size={22} />}
                   </div>
                 );
               })()}
@@ -609,9 +612,9 @@ const LobbyPage: React.FC = () => {
                 return pa.answer;
               })();
               return (
-                <li key={idx} className="border-bottom" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '5px 0' }}>
+                <li key={idx} className="border-bottom vote-row">
                   <span>{pa.name}: <strong>{displayAnswer}</strong></span>
-                  <span>{pa.is_correct ? '✅' : '❌'}</span>
+                  {pa.is_correct ? <CheckCircle2 className="text-success vote-icon" size={18} /> : <XCircle className="text-danger vote-icon" size={18} />}
                 </li>
               );
             })}
@@ -631,9 +634,9 @@ const LobbyPage: React.FC = () => {
             if (!isAlive || answerSubmitted) return null;
 
             const jokers = [
-              { type: '5050', label: '50:50', icon: '🌗' },
-              { type: 'audience', label: t('joker_audience'), icon: '👥' },
-              { type: 'phone', label: t('joker_phone'), icon: '📞' }
+              { type: '5050', label: '50:50', Icon: Split },
+              { type: 'audience', label: t('joker_audience'), Icon: Users },
+              { type: 'phone', label: t('joker_phone'), Icon: Phone }
             ];
 
             return (
@@ -646,9 +649,8 @@ const LobbyPage: React.FC = () => {
                       onClick={() => handleUseJoker(joker.type)}
                       disabled={isUsed}
                       className="joker-button"
-                      style={{ opacity: isUsed ? 0.6 : 1 }}
                     >
-                      {joker.icon} {joker.label}
+                      <joker.Icon size={16} /> {joker.label}
                     </button>
                   );
                 })}
@@ -657,6 +659,10 @@ const LobbyPage: React.FC = () => {
           })()}
 
           <div className="question-box">
+            <div className="question-meta">
+              <span className="question-meta-badge">{t('level')}: {currentQuestion.level}</span>
+              <span className="question-meta-badge">{t('price_money')}: {currentQuestion.prize?.toLocaleString('de-DE')}€</span>
+            </div>
             {(currentQuestion.questionTranslations && currentQuestion.questionTranslations[language])
               ? currentQuestion.questionTranslations[language]
               : currentQuestion.question}
@@ -678,8 +684,8 @@ const LobbyPage: React.FC = () => {
             return (
               <>
                 {!isAlive && (
-                  <div style={{ textAlign: 'center', margin: '10px 0', color: 'var(--danger-color)', fontWeight: 'bold' }}>
-                    🚫 You are eliminated (Spectator Mode) 🚫
+                  <div className="spectator-mode">
+                    <EyeOff size={18} /> You are eliminated (Spectator Mode)
                   </div>
                 )}
                 <div className="options-grid">
@@ -705,7 +711,7 @@ const LobbyPage: React.FC = () => {
                         disabled={!isAlive || answerSubmitted}
                         className={`option-button ${selectedAnswer === optionText ? 'selected' : ''}`}
                       >
-                        <span className="option-prefix">{prefix}:</span> {optionDisplay}
+                        <span className="option-prefix">{prefix}</span> {optionDisplay}
                       </button>
                     );
                   })}
@@ -715,10 +721,6 @@ const LobbyPage: React.FC = () => {
                     onClick={handleAnswerSubmit}
                     disabled={!selectedAnswer || !isAlive}
                     className="submit-button"
-                    style={{
-                      backgroundColor: !isAlive ? '#555' : '',
-                      cursor: !isAlive ? 'not-allowed' : 'pointer'
-                    }}
                   >
                     {!isAlive ? t('btn_eliminated') : t('btn_submit')}
                   </button>
@@ -741,42 +743,34 @@ const LobbyPage: React.FC = () => {
             <div
               key={i}
               className={`teammate-card ${gameData?.game_mode === 'survival' && p.lives === 0 ? 'dead' : ''}`}
-              style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center' }}
             >
               {/* Avatar Display */}
-              <div style={{
-                width: '50px',
-                height: '50px',
-                borderRadius: '50%',
-                overflow: 'hidden',
-                marginBottom: '8px',
-                border: '2px solid rgba(255,255,255,0.2)',
-                backgroundColor: '#333'
-              }}>
+              <div className="teammate-avatar">
                 {p.avatar_url ? (
                   <img
                     src={p.avatar_url}
                     alt={p.name}
-                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
                   />
                 ) : (
-                  <div style={{
-                    width: '100%',
-                    height: '100%',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    backgroundColor: '#555',
-                    fontSize: '1.2em'
-                  }}>
+                  <span className="teammate-avatar-initial">
                     {p.name.charAt(0).toUpperCase()}
-                  </div>
+                  </span>
                 )}
               </div>
 
+              {gameData?.game_mode === 'survival' && p.lives === 0 && (
+                <div className="teammate-dead-overlay">
+                  <Skull size={24} />
+                </div>
+              )}
+
               <div className="font-bold">{p.name}</div>
               <div>{t('price_money')}: {p.score?.toLocaleString('de-DE')}€</div>
-              {gameData?.game_mode === 'survival' && <div>Lives: {p.lives} ❤️</div>}
+              {gameData?.game_mode === 'survival' && (
+                <div className="lives-row">
+                  {p.lives === 0 ? <Skull size={14} /> : <Heart size={14} fill="currentColor" />} Lives: {p.lives}
+                </div>
+              )}
 
               {/* HOST CONTROLS */}
               {/* Check if current user is host (via gameData.host_id, assuming we expose it) */}
@@ -791,7 +785,7 @@ const LobbyPage: React.FC = () => {
                       className="btn btn-sm btn-danger"
                       style={{ fontSize: '0.7em', padding: '2px 5px' }}
                     >
-                      {t('btn_kick')} 👢
+                      <UserX size={13} /> {t('btn_kick')}
                     </button>
                   ) : null}
                 </div>

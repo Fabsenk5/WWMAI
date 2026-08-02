@@ -9,6 +9,7 @@ import QuestionDisplay from '../components/QuestionDisplay';
 import Scoreboard from '../components/Scoreboard';
 import { API_BASE_URL } from '../config/api';
 import io from 'socket.io-client';
+import { Trophy, Skull, Flame, Users, PartyPopper, Ghost } from 'lucide-react';
 import '../styles/Game.css';
 
 const GamePage: React.FC = () => {
@@ -295,7 +296,7 @@ const GamePage: React.FC = () => {
         <h1>{t('game_page')}</h1>
         <div className="game-info-item">
           <span className="game-mode-badge">
-            {t('mode')}: {gameData?.game_mode === 'survival' ? '🔥 Survival' : '🤝 Cooperative'}
+            {t('mode')}: {gameData?.game_mode === 'survival' ? <><Flame size={14} /> Survival</> : <><Users size={14} /> Cooperative</>}
           </span>
           <span>ID: {id}</span>
         </div>
@@ -307,22 +308,21 @@ const GamePage: React.FC = () => {
       </div>
 
       {gameEnded ? (
-        <div className="text-center" style={{ padding: '40px', textAlign: 'center' }}>
+        <div className="game-ended-screen">
           {isWinner ? (
             <div>
-              <h1 style={{ color: 'var(--success-color)', fontSize: '3rem', marginBottom: '20px' }}>🏆 VICTORY! 🏆</h1>
-              <div style={{ fontSize: '4rem', marginBottom: '20px' }}>🎉</div>
+              <h1 className="game-ended-title victory"><Trophy size={44} /> VICTORY! <Trophy size={44} /></h1>
+              <div className="game-ended-icon"><PartyPopper size={56} /></div>
             </div>
           ) : (
             <div>
-              <h1 style={{ color: 'var(--danger-color)', fontSize: '3rem', marginBottom: '20px' }}>💀 GAME OVER 💀</h1>
-              <div style={{ fontSize: '4rem', marginBottom: '20px' }}>👻</div>
+              <h1 className="game-ended-title defeat"><Skull size={44} /> GAME OVER <Skull size={44} /></h1>
+              <div className="game-ended-icon"><Ghost size={56} /></div>
             </div>
           )}
-          <h2 style={{ color: 'var(--text-primary)' }}>{gameEndMessage || t('game_over')}</h2>
+          <h2 className="game-ended-message">{gameEndMessage || t('game_over')}</h2>
           <button
-            className="button"
-            style={{ marginTop: '30px', backgroundColor: 'var(--text-secondary)' }}
+            className="button return-lobby-btn"
             onClick={() => window.location.href = '/lobby'}
           >
             Return to Lobby

@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { API_BASE_URL } from '../config/api';
 import { useAuth } from '../context/AuthContext';
-import { ArrowLeft, Plus, CheckCircle, Circle, Trash2, Loader2 } from 'lucide-react';
+import { ArrowLeft, Plus, CheckCircle, Circle, Trash2, Loader2, Rocket, Sparkles } from 'lucide-react';
 import { Link } from 'react-router-dom';
 import '../styles/Forms.css'; // Use shared form styles
 import '../styles/FeatureWishlist.css';
@@ -97,18 +97,18 @@ const FeatureWishlist: React.FC = () => {
 
     return (
         <div className="form-page-container">
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
-                <Link to="/" style={{ color: 'var(--text-secondary)', display: 'flex', alignItems: 'center', textDecoration: 'none' }}>
-                    <ArrowLeft size={24} style={{ marginRight: '0.5rem' }} />
+            <div className="wishlist-header">
+                <Link to="/" className="wishlist-back-link">
+                    <ArrowLeft size={24} />
                     Back
                 </Link>
-                <h1 style={{ margin: 0 }}>Feature Wishlist</h1>
+                <h1>Feature Wishlist</h1>
             </div>
 
 
             {/* Hero Card */}
             <div className="wishlist-hero">
-                <h2>Dream Big! 🚀</h2>
+                <h2>Dream Big! <Rocket className="wishlist-hero-icon" size={20} /></h2>
                 <p>
                     Here is a list of features we are planning or dreaming about.
                     Stay tuned for upcoming updates!
@@ -149,7 +149,7 @@ const FeatureWishlist: React.FC = () => {
                             className="wishlist-toggle-btn"
                         >
                             {wish.status === 'completed' ? (
-                                <CheckCircle size={24} color="#22c55e" />
+                                <CheckCircle size={24} />
                             ) : (
                                 <Circle size={24} />
                             )}
@@ -180,8 +180,9 @@ const FeatureWishlist: React.FC = () => {
                 ))}
 
                 {wishes.length === 0 && !loading && (
-                    <div style={{ textAlign: 'center', padding: '3rem', color: '#6b7280' }}>
-                        No wishes yet. Time to dream! ✨
+                    <div className="wishlist-empty">
+                        <Sparkles size={18} />
+                        <span>No wishes yet. Time to dream!</span>
                     </div>
                 )}
 

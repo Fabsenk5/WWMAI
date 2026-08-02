@@ -1,4 +1,5 @@
 import React from 'react';
+import { Play, Pause, Volume2, Volume1, VolumeX } from 'lucide-react';
 import { useAudio } from '../context/AudioContext';
 import './AudioPlayer.css';
 
@@ -6,9 +7,9 @@ const AudioPlayer: React.FC = () => {
     const { isPlaying, togglePlay, volume, setVolume, isMuted, toggleMute } = useAudio();
 
     const getVolumeIcon = () => {
-        if (isMuted || volume === 0) return '🔇';
-        if (volume < 0.5) return '🔉';
-        return '🔊';
+        if (isMuted || volume === 0) return <VolumeX size={18} />;
+        if (volume < 0.5) return <Volume1 size={18} />;
+        return <Volume2 size={18} />;
     };
 
     return (
@@ -18,7 +19,7 @@ const AudioPlayer: React.FC = () => {
                 onClick={togglePlay}
                 title={isPlaying ? "Pause Music" : "Play Music"}
             >
-                {isPlaying ? '⏸️' : '▶️'}
+                {isPlaying ? <Pause size={18} /> : <Play size={18} />}
             </button>
 
             <div className="volume-control">

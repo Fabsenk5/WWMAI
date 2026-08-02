@@ -1,5 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
+import '../styles/Game.css';
 
 interface PlayerScore {
     name: string;
@@ -34,7 +35,12 @@ const Scoreboard: React.FC<ScoreboardProps> = ({ players, gameEnded }) => {
                 <tbody>
                     {players.map((player, index) => (
                         <tr key={index}>
-                            <td>{player.name}</td>
+                            <td>
+                                <span className="scoreboard-name">
+                                    <span className="scoreboard-avatar">{player.name.charAt(0).toUpperCase()}</span>
+                                    {player.name}
+                                </span>
+                            </td>
                             <td>{player.score}</td>
                             <td>{player.lives}</td>
                         </tr>
