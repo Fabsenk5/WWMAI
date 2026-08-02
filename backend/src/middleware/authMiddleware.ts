@@ -1,7 +1,14 @@
 import { Request, Response, NextFunction } from 'express';
 import jwt from 'jsonwebtoken';
 
-const JWT_SECRET = process.env.JWT_SECRET || 'your_jwt_secret_key_change_in_prod';
+const jwtSecret = process.env.JWT_SECRET;
+if (!jwtSecret) {
+    if (process.env.NODE_ENV === 'production') {
+        throw new Error('JWT_SECRET must be set in production.');
+    }
+    console.warn('[authMiddleware] JWT_SECRET not set. Using insecure development default!');
+}
+const JWT_SECRET = jwtSecret || 'your_jwt_secret_key_change_in_prod';
 
 export interface AuthRequest extends Request {
     user?: any;

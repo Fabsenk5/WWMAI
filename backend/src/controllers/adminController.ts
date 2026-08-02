@@ -9,7 +9,17 @@ export class AdminController {
     private questionModel: QuestionModel;
     private db: Pool;
     private aiService: AiService;
-    private adminPassword = process.env.ADMIN_PASSWORD || 'admin';
+    private adminPassword = (() => {
+        const pw = process.env.ADMIN_PASSWORD;
+        if (!pw) {
+            if (process.env.NODE_ENV === 'production') {
+                throw new Error('ADMIN_PASSWORD must be set in production.');
+            }
+            console.warn('[AdminController] ADMIN_PASSWORD not set. Using insecure development default!');
+            return 'admin';
+        }
+        return pw;
+    })();
 
     constructor(pool: Pool) {
         this.db = pool;

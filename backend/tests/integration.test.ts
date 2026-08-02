@@ -8,7 +8,7 @@ import path from 'path'; // Import path for resolving file path
 // Import server and io instead of app
 import { server, io } from '../src/app';
 import pool from '../src/database/db';
-import { seedDatabase } from '../src/database/database/seed';
+import { checkAndSeedDatabase } from '../src/database/seed';
 import { GameController } from '../src/controllers/gameController';
 import { Server as MockSocketIOServer } from 'socket.io';
 import { io as clientIo } from 'socket.io-client'; // Correct import for socket.io-client
@@ -73,7 +73,7 @@ describe('API Integration Tests', () => {
 
             // Seed the database with questions and rooms
             console.log('Seeding the database with initial data...');
-            await seedDatabase();
+            await checkAndSeedDatabase();
             console.log('Database seeding complete.');
 
         } catch (error) {
