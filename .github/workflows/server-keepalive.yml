@@ -23,7 +23,7 @@ jobs:
           echo "Pinging server at $(date)"
           
           # Get the backend URL from repository secret or use default
-          BACKEND_URL="${{ secrets.BACKEND_URL || 'https://wer-wird-millionar-mp.onrender.com' }}"
+          BACKEND_URL="${{ secrets.BACKEND_URL || 'https://wwm-backend-t3ij.onrender.com' }}"
           
           # Ping the health endpoint
           response=$(curl -s -o /dev/null -w "%{http_code}" "$BACKEND_URL/health")
@@ -37,7 +37,7 @@ jobs:
       
       - name: Validate database connection
         run: |
-          BACKEND_URL="${{ secrets.BACKEND_URL || 'https://wer-wird-millionar-mp.onrender.com' }}"
+          BACKEND_URL="${{ secrets.BACKEND_URL || 'https://wwm-backend-t3ij.onrender.com' }}"
           
           # Get detailed health info
           health_data=$(curl -s "$BACKEND_URL/health")

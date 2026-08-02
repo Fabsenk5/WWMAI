@@ -13,4 +13,4 @@ jobs:
       - name: Ping Render Backend
         run: |
           echo "Pinging Render backend to prevent cold start..."
-          curl -s -o /dev/null -w "Backend: %{http_code} in %{time_total}s\n" https://wer-wird-millionar-mp.onrender.com/health || echo "Backend ping failed"
+          curl -s -o /dev/null -w "Backend: %{http_code} in %{time_total}s\n" https://wwm-backend-t3ij.onrender.com/health || echo "Backend ping failed"
