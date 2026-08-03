@@ -8,9 +8,10 @@ import { useModal } from '../context/ModalContext';
 import { useAudio } from '../context/AudioContext';
 import io, { Socket } from 'socket.io-client';
 import axios from 'axios';
-import { Heart, Skull, Trophy, Split, Users, Phone, UserX, CheckCircle2, XCircle, EyeOff, Timer, Link2, LogOut, WifiOff } from 'lucide-react';
+import { Heart, Skull, Trophy, Split, Users, Phone, UserX, CheckCircle2, XCircle, EyeOff, Timer, Link2, LogOut, WifiOff, RefreshCw, MessageSquare, Send } from 'lucide-react';
 import './LobbyPage.css'; // Import the new CSS file
 import { API_BASE_URL } from '../config/api';
+import { isInitialAvatar, getAvatarColor } from '../utils/avatar';
 
 interface PlayerAnswer {
   name: string;
@@ -61,7 +62,7 @@ const LobbyPage: React.FC = () => {
   const { gameData, setGameData } = context || {};
 
   const { showModal, showAlert } = useModal();
-  const { playTrack, playSFX, getAudioForLevel, stopAll } = useAudio();
+  const { playTrack, playSFX, playTick, playClick, getAudioForLevel, stopAll } = useAudio();
 
   const [players, setPlayers] = useState<User[]>([]);
   const [currentQuestion, setCurrentQuestion] = useState<QuestionPayload | null>(null);
@@ -86,6 +87,16 @@ const LobbyPage: React.FC = () => {
   const [offlineUsers, setOfflineUsers] = useState<Set<string>>(new Set());
   const [copiedInvite, setCopiedInvite] = useState(false);
 
+  // Emotes + chat
+  const [emotes, setEmotes] = useState<{ id: number; userId: string; emote: string }[]>([]);
+  const emoteIdRef = useRef(0);
+  const [chatOpen, setChatOpen] = useState(false);
+  const [chatMessages, setChatMessages] = useState<{ userId: string; text: string }[]>([]);
+  const [chatInput, setChatInput] = useState('');
+
+  // Personal round stats for the end-of-game summary
+  const [roundStats, setRoundStats] = useState({ correct: 0, total: 0 });
+
   // REMOVED early return here to avoid conditional hook execution error
 
   const socketRef = useRef<Socket | null>(null);
@@ -93,6 +104,7 @@ const LobbyPage: React.FC = () => {
   const pendingTrackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const answerDeadlineRef = useRef<number | null>(null);
   const pausedRemainingRef = useRef<number | null>(null);
+  const timesUpPlayedRef = useRef(false);
 
   // Countdown toward the server's answer deadline (frozen while paused)
   useEffect(() => {
@@ -113,6 +125,17 @@ const LobbyPage: React.FC = () => {
   useEffect(() => {
     pausedRemainingRef.current = pausedRemaining;
   }, [pausedRemaining]);
+
+  // Countdown sounds: ticks for the last 10 seconds, "Time's Up" at zero
+  useEffect(() => {
+    if (answerTimeLeft === null || revealedAnswers || answerSubmitted) return;
+    if (answerTimeLeft <= 10 && answerTimeLeft > 0) {
+      playTick();
+    } else if (answerTimeLeft === 0 && !timesUpPlayedRef.current) {
+      timesUpPlayedRef.current = true;
+      playSFX('72 Time\'s Up.mp3');
+    }
+  }, [answerTimeLeft, revealedAnswers, answerSubmitted, playTick, playSFX]);
 
   const setGameDataFromContext = setGameData!;
 
@@ -139,6 +162,9 @@ const LobbyPage: React.FC = () => {
 
         if (qData && (qData.id || qData.question)) {
           setCurrentQuestion(qData);
+          if (qData.answerDeadline) {
+            setAnswerDeadline(qData.answerDeadline);
+          }
           if (qData.userHasAnswered) {
             setSelectedAnswer(qData.userAnswer);
             setAnswerSubmitted(true);
@@ -211,6 +237,7 @@ const LobbyPage: React.FC = () => {
       setJokerResult(null);
       setAnswerDeadline(question.answerDeadline || null);
       setPausedRemaining(null);
+      timesUpPlayedRef.current = false;
 
       // Audio: Play background loop for level
       // Level 1 plays the "Let's Play" intro stinger first, then the level loop.
@@ -276,6 +303,23 @@ const LobbyPage: React.FC = () => {
       }
       setWaitingForCount(null);
       setGameDataFromContext(prev => prev ? { ...prev, lives: data.livesRemaining } : null);
+
+      // Track personal round stats for the end-of-game summary
+      setRoundStats(prev => {
+        let isCorrectForStats = false;
+        if (data.gameMode === 'survival') {
+          const myName = getSafeStorage('userName');
+          const myUserId = getSafeStorage('userId');
+          const myResult = data.playerAnswers.find(p =>
+            (myUserId && (p as any).userId === myUserId) || p.name === myName
+          );
+          if (!myResult) return prev; // spectator without own answer: not counted
+          isCorrectForStats = myResult.is_correct;
+        } else {
+          isCorrectForStats = data.isTeamCorrect;
+        }
+        return { correct: prev.correct + (isCorrectForStats ? 1 : 0), total: prev.total + 1 };
+      });
 
       // Handle Game End inline
       if (data.gameEnded) {
@@ -388,6 +432,20 @@ const LobbyPage: React.FC = () => {
       }
     };
 
+    const handlePlayerEmote = (data: { userId: string; emote: string }) => {
+      if (!data?.emote) return;
+      const id = ++emoteIdRef.current;
+      setEmotes(prev => [...prev.slice(-9), { id, userId: data.userId, emote: data.emote }]);
+      setTimeout(() => {
+        setEmotes(prev => prev.filter(e => e.id !== id));
+      }, 2500);
+    };
+
+    const handleChatMessage = (data: { userId: string; text: string }) => {
+      if (!data?.text) return;
+      setChatMessages(prev => [...prev.slice(-49), { userId: data.userId, text: data.text }]);
+    };
+
     const handleJokerUsed = (data: { jokerType: string, userId: string }) => {
       // Audio: Joker SFX
       if (data.jokerType === '5050') playSFX('67 50-50.mp3');
@@ -403,12 +461,15 @@ const LobbyPage: React.FC = () => {
     };
 
     socket.on('newQuestion', handleNewQuestion);
+    socket.on('questionSwitched', handleNewQuestion);
     socket.on('playerAnswered', handlePlayerAnswered);
     socket.on('gameStarted', handleGameStarted);
     socket.on('revealAnswers', handleRevealAnswers);
     socket.on('gameEnded', handleGameEnded);
     socket.on('userJoined', handleUserJoined);
     socket.on('playerDisconnected', handlePlayerDisconnected);
+    socket.on('playerEmote', handlePlayerEmote);
+    socket.on('chatMessage', handleChatMessage);
     socket.on('jokerUsed', handleJokerUsed);
     socket.on('gamePaused', handleGamePaused);
     socket.on('gameResumed', handleGameResumed);
@@ -440,12 +501,15 @@ const LobbyPage: React.FC = () => {
     return () => {
       socket.off('connect', onConnect);
       socket.off('newQuestion', handleNewQuestion);
+      socket.off('questionSwitched', handleNewQuestion);
       socket.off('playerAnswered', handlePlayerAnswered);
       socket.off('gameStarted', handleGameStarted);
       socket.off('revealAnswers', handleRevealAnswers);
       socket.off('gameEnded', handleGameEnded);
       socket.off('userJoined', handleUserJoined);
       socket.off('playerDisconnected', handlePlayerDisconnected);
+      socket.off('playerEmote', handlePlayerEmote);
+      socket.off('chatMessage', handleChatMessage);
       socket.off('jokerUsed', handleJokerUsed);
       socket.off('gamePaused', handleGamePaused);
       socket.off('gameResumed', handleGameResumed);
@@ -577,6 +641,24 @@ const LobbyPage: React.FC = () => {
     navigate('/');
   };
 
+  const sendEmote = (emote: string) => {
+    socketRef.current?.emit('playerEmote', { emote });
+  };
+
+  const sendChat = () => {
+    const text = chatInput.trim();
+    if (!text) return;
+    socketRef.current?.emit('chatMessage', { text });
+    setChatMessages(prev => [...prev.slice(-49), { userId: getSafeStorage('userId') || 'me', text }]);
+    setChatInput('');
+  };
+
+  const getPlayerName = (userId: string) => {
+    const p = players.find(pl => pl.userId === userId);
+    if (p) return p.name;
+    return userId === (getSafeStorage('userId') || '') ? 'Du' : userId;
+  };
+
   const handleAnswerSubmit = async () => {
     if (!selectedAnswer || !currentQuestion || !roomCode) return;
     try {
@@ -676,6 +758,14 @@ const LobbyPage: React.FC = () => {
                   {gameResult === 'victory'
                     ? 'Congratulations! You are a Millionaire!'
                     : 'Better luck next time!'}
+                </div>
+                <div className="game-over-stats">
+                  {t('correct')}: {roundStats.correct}/{roundStats.total} · {t('price_money')}:{' '}
+                  {(() => {
+                    const myUserId = getSafeStorage('userId');
+                    const me = players.find(p => p.userId === myUserId);
+                    return me?.score?.toLocaleString('de-DE') ?? '0';
+                  })()}€
                 </div>
                 <button className="leave-btn" onClick={() => navigate('/')}>
                   Main Menu
@@ -819,7 +909,8 @@ const LobbyPage: React.FC = () => {
             const jokers = [
               { type: '5050', label: '50:50', Icon: Split },
               { type: 'audience', label: t('joker_audience'), Icon: Users },
-              { type: 'phone', label: t('joker_phone'), Icon: Phone }
+              { type: 'phone', label: t('joker_phone'), Icon: Phone },
+              { type: 'switch', label: t('joker_switch'), Icon: RefreshCw }
             ];
 
             return (
@@ -841,14 +932,24 @@ const LobbyPage: React.FC = () => {
             );
           })()}
 
-          <div className="question-box">
+          <div className="question-box" key={currentQuestion.id}>
             <div className="question-meta">
+              {currentQuestion.category && <span className="question-meta-badge">{currentQuestion.category}</span>}
               <span className="question-meta-badge">{t('level')}: {currentQuestion.level}</span>
               <span className="question-meta-badge">{t('price_money')}: {currentQuestion.prize?.toLocaleString('de-DE')}€</span>
             </div>
             {(currentQuestion.questionTranslations && currentQuestion.questionTranslations[language])
               ? currentQuestion.questionTranslations[language]
               : currentQuestion.question}
+
+            <div className="emote-overlay" aria-hidden="true">
+              {emotes.map(e => (
+                <div key={e.id} className="emote-bubble">
+                  <span className="emote-char">{e.emote}</span>
+                  <span className="emote-name">{getPlayerName(e.userId)}</span>
+                </div>
+              ))}
+            </div>
           </div>
 
           {answerTimeLeft !== null && (
@@ -856,6 +957,12 @@ const LobbyPage: React.FC = () => {
               <Timer size={16} /> {answerTimeLeft}s
             </div>
           )}
+
+          <div className="emote-bar">
+            {['👍', '😂', '😱', '🎉', '😎', '🤔'].map(e => (
+              <button key={e} className="emote-btn" onClick={() => sendEmote(e)} title={`Send ${e}`}>{e}</button>
+            ))}
+          </div>
 
           {/* Modal now handled by Context */}
 
@@ -896,7 +1003,7 @@ const LobbyPage: React.FC = () => {
                     return (
                       <button
                         key={index}
-                        onClick={() => setSelectedAnswer(optionText)}
+                        onClick={() => { setSelectedAnswer(optionText); playClick(); }}
                         disabled={!isAlive || answerSubmitted || gameData?.status === 'paused' || answerTimeLeft === 0}
                         className={`option-button ${selectedAnswer === optionText ? 'selected' : ''}`}
                       >
@@ -936,13 +1043,16 @@ const LobbyPage: React.FC = () => {
             >
               {/* Avatar Display */}
               <div className="teammate-avatar">
-                {p.avatar_url ? (
+                {p.avatar_url && !isInitialAvatar(p.avatar_url) ? (
                   <img
                     src={p.avatar_url}
                     alt={p.name}
                   />
                 ) : (
-                  <span className="teammate-avatar-initial">
+                  <span
+                    className="teammate-avatar-initial"
+                    style={getAvatarColor(p.avatar_url) ? { backgroundColor: getAvatarColor(p.avatar_url) as string } : undefined}
+                  >
                     {p.name.charAt(0).toUpperCase()}
                   </span>
                 )}
@@ -983,6 +1093,33 @@ const LobbyPage: React.FC = () => {
             </div>
           ))}
         </div>
+      </div>
+
+      <div className="chat-section">
+        <button className="chat-toggle" onClick={() => setChatOpen(!chatOpen)}>
+          <MessageSquare size={16} /> {t('chat')} {chatOpen ? '▾' : '▸'}
+        </button>
+        {chatOpen && (
+          <div className="chat-panel">
+            <div className="chat-messages">
+              {chatMessages.length === 0 && <div className="chat-empty">{t('chat_empty')}</div>}
+              {chatMessages.map((m, i) => (
+                <div key={i} className="chat-message"><strong>{getPlayerName(m.userId)}:</strong> {m.text}</div>
+              ))}
+            </div>
+            <div className="chat-input-row">
+              <input
+                className="form-input"
+                value={chatInput}
+                onChange={e => setChatInput(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') sendChat(); }}
+                placeholder={t('chat_placeholder')}
+                maxLength={200}
+              />
+              <button className="btn btn-primary btn-sm" onClick={sendChat}><Send size={14} /></button>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

@@ -1,5 +1,37 @@
 /* ProfilePage.css — built on the App.css design tokens */
 
+/* Avatar picker */
+.avatar-picker {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.avatar-pick {
+    width: 40px;
+    height: 40px;
+    padding: 0;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    box-shadow: none;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.9rem;
+    color: #fff;
+    cursor: pointer;
+    transition: transform var(--transition-fast), border-color var(--transition-fast);
+}
+
+.avatar-pick:hover:not(:disabled) {
+    transform: scale(1.12);
+    box-shadow: none;
+}
+
+.avatar-pick-active {
+    border-color: var(--text-primary);
+}
+
 .profile-header {
     display: flex;
     justify-content: space-between;

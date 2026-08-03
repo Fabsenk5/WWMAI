@@ -204,6 +204,26 @@ socketIoInstance.on('connection', (socket: Socket) => {
         }
     });
 
+    socket.on('playerEmote', (data: { emote: string }) => {
+        const roomCode = socket.data.roomCode as string | undefined;
+        if (roomCode && data?.emote) {
+            socket.to(roomCode).emit('playerEmote', {
+                userId: socket.data.userId,
+                emote: String(data.emote).slice(0, 8),
+            });
+        }
+    });
+
+    socket.on('chatMessage', (data: { text: string }) => {
+        const roomCode = socket.data.roomCode as string | undefined;
+        if (roomCode && data?.text) {
+            socket.to(roomCode).emit('chatMessage', {
+                userId: socket.data.userId,
+                text: String(data.text).slice(0, 200),
+            });
+        }
+    });
+
     socket.on('disconnect', () => {
         // Let the room know this player went offline (if they had joined a room)
         const roomCode = socket.data.roomCode as string | undefined;

@@ -13,6 +13,7 @@ interface User {
     total_earnings?: number;
     current_win_streak?: number;
     longest_win_streak?: number;
+    points?: number;
     best_category?: { category: string; count: number };
     worst_category?: { category: string; count: number };
 }

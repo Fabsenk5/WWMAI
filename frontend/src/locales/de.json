@@ -38,7 +38,6 @@
     "game_mode_coop": "Kooperativ Millionär",
     "team_lives": "Team-Leben",
     "room": "Raum",
-    "level": "Stufe",
     "waiting_teammates": "Warte auf Team...",
     "round_results": "Rundenergebnisse",
     "your_answer": "Deine Antwort",
@@ -54,5 +53,9 @@
     "btn_eliminated": "Eliminiert",
     "btn_kick": "Kicken",
     "joker_audience": "Publikum",
-    "joker_phone": "Telefon"
+    "joker_phone": "Telefon",
+    "joker_switch": "Frage tauschen",
+    "chat": "Chat",
+    "chat_empty": "Noch keine Nachrichten. Sag Hallo!",
+    "chat_placeholder": "Nachricht schreiben..."
 }

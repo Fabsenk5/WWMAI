@@ -129,6 +129,9 @@ export const syncDatabaseSchema = async () => {
         // New column for player_answers to persist stats even if questions are deleted
         await addColumnIfNotExists('player_answers', 'category', 'VARCHAR(50)');
 
+        // Leaderboard points
+        await addColumnIfNotExists('users', 'points', 'INT DEFAULT 0');
+
 
         // 4. Ensure 'players' table exists
         await client.query(`

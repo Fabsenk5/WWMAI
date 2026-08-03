@@ -38,7 +38,6 @@
     "game_mode_coop": "Millonario Cooperativo",
     "team_lives": "Vidas de equipo",
     "room": "Sala",
-    "level": "Nivel",
     "waiting_teammates": "Esperando al equipo...",
     "round_results": "Resultados de ronda",
     "your_answer": "Tu respuesta",
@@ -54,5 +53,9 @@
     "btn_eliminated": "Eliminado",
     "btn_kick": "Expulsar",
     "joker_audience": "Público",
-    "joker_phone": "Llamada"
+    "joker_phone": "Llamada",
+    "joker_switch": "Cambiar pregunta",
+    "chat": "Chat",
+    "chat_empty": "Aún no hay mensajes. ¡Saluda!",
+    "chat_placeholder": "Escribe un mensaje..."
 }

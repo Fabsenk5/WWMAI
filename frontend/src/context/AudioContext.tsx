@@ -10,6 +10,8 @@ interface AudioContextType {
     currentTrack: string;
     playTrack: (trackName: string, loop?: boolean) => void;
     playSFX: (trackName: string) => void;
+    playTick: () => void;
+    playClick: () => void;
     stopAll: () => void;
     getAudioForLevel: (level: number, type: 'question' | 'final_answer' | 'win' | 'lose') => string;
 }
@@ -42,6 +44,36 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     // Master volume multiplier to reduce overall loudness
     const MASTER_VOLUME = 0.5;
+    const audioCtxRef = useRef<AudioContext | null>(null);
+
+    // Short synthesized beeps (no asset needed) for countdown ticks and clicks
+    const playTone = useCallback((freq: number, durationMs: number, type: OscillatorType = 'square', gain: number = 0.1) => {
+        try {
+            if (isMutedRef.current || volumeRef.current <= 0) return;
+            if (!audioCtxRef.current) {
+                const Ctx = window.AudioContext || (window as any).webkitAudioContext;
+                if (!Ctx) return;
+                audioCtxRef.current = new Ctx();
+            }
+            const ctx = audioCtxRef.current;
+            if (ctx.state === 'suspended') ctx.resume();
+            const osc = ctx.createOscillator();
+            const g = ctx.createGain();
+            osc.type = type;
+            osc.frequency.value = freq;
+            g.gain.setValueAtTime(gain * volumeRef.current * MASTER_VOLUME, ctx.currentTime);
+            g.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + durationMs / 1000);
+            osc.connect(g);
+            g.connect(ctx.destination);
+            osc.start();
+            osc.stop(ctx.currentTime + durationMs / 1000);
+        } catch (err) {
+            console.warn('[Audio] Tone playback failed:', err);
+        }
+    }, []);
+
+    const playTick = useCallback(() => playTone(880, 50, 'square', 0.08), [playTone]);
+    const playClick = useCallback(() => playTone(1150, 25, 'square', 0.06), [playTone]);
 
     // Initialize audio element
     useEffect(() => {
@@ -240,7 +272,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }, []);
 
     return (
-        <AudioContext.Provider value={{ isPlaying, volume, togglePlay, setVolume, isMuted, toggleMute, currentTrack, playTrack, playSFX, stopAll, getAudioForLevel }}>
+        <AudioContext.Provider value={{ isPlaying, volume, togglePlay, setVolume, isMuted, toggleMute, currentTrack, playTrack, playSFX, playTick, playClick, stopAll, getAudioForLevel }}>
             {children}
         </AudioContext.Provider>
     );

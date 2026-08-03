@@ -6,6 +6,7 @@ interface Question {
     question: string;
     options: string[];
     correctAnswer: string;
+    category?: string;
 }
 
 interface QuestionDisplayProps {
@@ -75,6 +76,7 @@ const QuestionDisplay: React.FC<QuestionDisplayProps> = ({
 
     return (
         <div className="question-display">
+            {q.category && <span className="question-meta-badge">{q.category}</span>}
             <h2 className="question-text">{displayText}</h2>
                 <div className="options-grid">
                 {(question.options || []).map((option: any, index: number) => {

@@ -38,7 +38,6 @@
     "game_mode_coop": "Кооперативный Миллионер",
     "team_lives": "Жизни команды",
     "room": "Комната",
-    "level": "Уровень",
     "waiting_teammates": "Ожидание команды...",
     "round_results": "Результаты раунда",
     "your_answer": "Ваш ответ",
@@ -54,5 +53,9 @@
     "btn_eliminated": "Выбыли",
     "btn_kick": "Выгнать",
     "joker_audience": "Аудитория",
-    "joker_phone": "Звонок"
+    "joker_phone": "Звонок",
+    "joker_switch": "Поменять вопрос",
+    "chat": "Чат",
+    "chat_empty": "Сообщений пока нет. Поздоровайся!",
+    "chat_placeholder": "Введите сообщение..."
 }

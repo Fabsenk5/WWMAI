@@ -25,7 +25,8 @@ CREATE TABLE users (
     games_won INT DEFAULT 0,
     total_earnings INT DEFAULT 0,
     current_win_streak INT DEFAULT 0,
-    longest_win_streak INT DEFAULT 0
+    longest_win_streak INT DEFAULT 0,
+    points INT DEFAULT 0
 );
 
 CREATE TABLE questions (

@@ -84,7 +84,8 @@ export class GameController {
                             games_won = COALESCE(games_won, 0) + 1,
                             total_earnings = COALESCE(total_earnings, 0) + $1,
                             current_win_streak = COALESCE(current_win_streak, 0) + 1,
-                            longest_win_streak = GREATEST(COALESCE(longest_win_streak, 0), COALESCE(current_win_streak, 0) + 1)
+                            longest_win_streak = GREATEST(COALESCE(longest_win_streak, 0), COALESCE(current_win_streak, 0) + 1),
+                            points = COALESCE(points, 0) + 50
                         WHERE id = $2
                     `, [earnings, uid]);
                 } else {
@@ -92,7 +93,8 @@ export class GameController {
                         UPDATE users SET 
                             games_played = COALESCE(games_played, 0) + 1,
                             total_earnings = COALESCE(total_earnings, 0) + $1,
-                            current_win_streak = 0
+                            current_win_streak = 0,
+                            points = COALESCE(points, 0) + 10
                         WHERE id = $2
                     `, [earnings, uid]);
                 }
@@ -1350,7 +1352,7 @@ export class GameController {
             }
 
             // Get game state
-            const gameQuery = `SELECT game_id, current_question_id, game_mode, jokers_used as team_jokers, jokers_5050_removed as team_5050_removed FROM games WHERE room_code = $1 AND status = 'started'`;
+            const gameQuery = `SELECT game_id, current_question_id, current_level, game_mode, jokers_used as team_jokers, jokers_5050_removed as team_5050_removed, selected_categories, difficulty_mode, wait_time, player_count, lives FROM games WHERE room_code = $1 AND status = 'started'`;
             const gameResult = await this.db.query(gameQuery, [roomCode]);
 
             if (gameResult.rows.length === 0) {
@@ -1358,7 +1360,7 @@ export class GameController {
                 return;
             }
 
-            const { game_id, current_question_id, game_mode, team_jokers, team_5050_removed } = gameResult.rows[0];
+            const { game_id, current_question_id, current_level, game_mode, team_jokers, team_5050_removed, selected_categories, difficulty_mode, wait_time, player_count, lives } = gameResult.rows[0];
 
             if (!current_question_id) {
                 res.status(409).json({ error: 'No active question.' });
@@ -1535,6 +1537,63 @@ export class GameController {
                         ? `I'm pretty sure it's "${question.correct_answer}".`
                         : `I'm not sure, maybe "${wrongOption}"?`
                 };
+            } else if (jokerType === 'switch') {
+                // Swap the current question for a fresh one on the same level
+                const usedRes = await this.db.query(
+                    `SELECT DISTINCT question_id FROM player_answers WHERE room_code = $1`,
+                    [roomCode]
+                );
+                const excludeIds = usedRes.rows
+                    .map((r: any) => r.question_id)
+                    .filter((id: any) => id !== null && id !== undefined);
+                if (!excludeIds.includes(current_question_id)) {
+                    excludeIds.push(current_question_id);
+                }
+
+                const categories = selected_categories || null;
+                const diffMode = difficulty_mode || 'standard';
+                const newQ = await this.questionModel.getQuestionByLevel(current_level, excludeIds, categories, diffMode);
+
+                if (!newQ) {
+                    res.status(409).json({ error: 'No alternative question available.' });
+                    return;
+                }
+
+                const newQuestionId = newQ.question_id || newQ.id;
+                await this.db.query(
+                    `UPDATE games SET current_question_id = $1, last_active = CURRENT_TIMESTAMP WHERE game_id = $2`,
+                    [newQuestionId, game_id]
+                );
+
+                const options = this.getConsistentOptions(
+                    newQuestionId,
+                    [...(newQ.incorrect_answers || []), newQ.correct_answer],
+                    newQ.translations
+                );
+                const questionTranslations: Record<string, string> = {};
+                if (newQ.translations) {
+                    for (const [lang, data] of Object.entries(newQ.translations) as [string, any][]) {
+                        questionTranslations[lang] = data.question;
+                    }
+                }
+
+                const newDeadline = Date.now() + GameController.QUESTION_TIMEOUT_MS;
+                // Restart the round timer for the swapped question
+                this.clearRoomTimer(roomCode);
+                this.io.to(roomCode).emit('questionSwitched', {
+                    id: newQuestionId,
+                    category: newQ.category,
+                    difficulty: newQ.difficulty,
+                    question: newQ.question,
+                    questionTranslations,
+                    level: current_level,
+                    prize: getPrizeForLevel(current_level),
+                    options,
+                    answerDeadline: newDeadline,
+                });
+                this.startRoundTimer(roomCode, game_id, current_level, wait_time ?? 15, newQ.correct_answer, player_count ?? 10, lives ?? 3);
+
+                payload = { switched: true };
             }
 
             // MARK AS USED
@@ -1687,6 +1746,19 @@ export class GameController {
             const isHost = authedUserId !== undefined && host_id !== null && host_id !== undefined
                 && String(host_id) === String(authedUserId);
 
+            // Remaining answer time for the current question (mirrors the running
+            // room timer so clients keep the correct countdown after a refresh).
+            let answerDeadline = Date.now() + GameController.QUESTION_TIMEOUT_MS;
+            const timerEntry = this.roomTimers.get(roomCode);
+            if (timerEntry) {
+                if (timerEntry.timer) {
+                    answerDeadline = timerEntry.startedAt + timerEntry.remainingMs;
+                } else {
+                    // paused — remaining time is frozen
+                    answerDeadline = Date.now() + timerEntry.remainingMs;
+                }
+            }
+
             // Handle non-active game states
             if (status === 'pending') {
                 res.status(200).json({ message: 'Game is pending and has not started yet.', status, question: null, options: [] });
@@ -1764,6 +1836,7 @@ export class GameController {
                         prize: getPrizeForLevel(current_level || 1),
                         options: options,
                         correctAnswer: isHost ? newQuestion.correct_answer : undefined,
+                        answerDeadline,
                         status: status,
                         userHasAnswered: false,
                         userAnswer: null,
@@ -1828,6 +1901,7 @@ export class GameController {
                     prize: getPrizeForLevel(current_level),
                     options: options,
                     correctAnswer: isHost ? newQuestion.correct_answer : undefined,
+                    answerDeadline,
                     status: status,
                     userHasAnswered: userHasAnswered,
                     userAnswer: userAnswer ? userAnswer.answer : null,
@@ -1863,6 +1937,7 @@ export class GameController {
                 prize: getPrizeForLevel(current_level),
                 options: options,
                 correctAnswer: isHost ? question.correct_answer : undefined,
+                answerDeadline,
                 status: status,
                 userHasAnswered: userHasAnswered,
                 userAnswer: userAnswer ? userAnswer.answer : null,

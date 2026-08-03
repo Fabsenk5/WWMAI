@@ -50,8 +50,8 @@ frontend/src/
 
 ### API + socket
 - REST under `/api/games`, `/api/auth`, `/api/admin`, `/api/billing`, `/api/feature-wishes`; health at `/health` (DB ping). Rate limits on `/api` (300/15min) and game creation (10/hour/IP).
-- Socket.IO events: server emits `gameStarted`, `newQuestion`, `playerAnswered`, `revealAnswers`, `gameEnded`, `jokerUsed`, `playerKicked`, `gamePaused`, `userJoined`; client emits `joinRoom`. The joinRoom socket handler lives in `app.ts`.
-- Question payload shape (over the wire): `{ id, category, difficulty, question, questionTranslations, level, prize, options:[{text, translations}] }`. Options are deterministically shuffled per question ID (`getConsistentOptions`).
+- Socket.IO events: server emits `gameStarted`, `newQuestion`, `playerAnswered`, `revealAnswers`, `gameEnded`, `jokerUsed`, `playerKicked`, `gamePaused`/`gameResumed`, `userJoined`, `playerDisconnected`, `playerLeft`, `playerEmote`, `chatMessage`, `questionSwitched`; client emits `joinRoom` (plus `playerEmote`, `chatMessage`). The joinRoom socket handler lives in `app.ts` (stores `socket.data.roomCode/userId` for disconnect broadcasting).
+- Question payload shape (over the wire): `{ id, category, difficulty, question, questionTranslations, level, prize, options:[{text, translations}], answerDeadline }`. Options are deterministically shuffled per question ID (`getConsistentOptions`).
 
 ### Game flow
 - Create → `POST /api/games/create` (room code = 6-char uppercase alnum). Join → `POST /api/games/join` (generates guest userId, auto-starts when room fills). Answer → `POST /api/games/:roomCode/submit-answer` (aliased by `/answer`).
@@ -59,7 +59,7 @@ frontend/src/
 - Difficulty per level (standard): L1-4 easy, L5-9 medium, L10-13 hard, L14-15 very_hard. Modes: `standard|easy|hard|mixed` (see `questionModel.getQuestionByLevel`; has adjacent-difficulty fallback chain).
 - **Game modes**: `cooperative` (team votes, majority answer decides, shared lives; wrong answer −1 life) and `survival` (per-player lives, individual score; eliminated players spectate).
 - Round resolution emits `revealAnswers`, then advances after `wait_time` (default 15s). `gameEnded` is emitted 30s+wait later. Stats finalized in `finalizeGameStats` (registered users only; guests skipped).
-- **Jokers** (`POST /api/games/:roomCode/joker`): `5050` (2 wrong removed), `audience` (simulated % stats, reliability scales down with difficulty), `phone` (heuristic friend). Co-op = team-scoped (games.jokers_used); survival = per-player (players.jokers_used).
+- **Jokers** (`POST /api/games/:roomCode/joker`): `5050` (2 wrong removed, stored in `jokers_5050_removed` so chained audience/phone jokers only poll the 2 remaining options), `audience` (simulated % stats, reliability scales down with difficulty), `phone` (heuristic friend), `switch` (swaps the question, restarts the round timer, emits `questionSwitched`). Co-op = team-scoped (games.jokers_used); survival = per-player (players.jokers_used).
 
 ### AI question generation
 - `AiService.ensureCategoryPool(category, threshold)` is fired in background on game creation if pool is low; capped at 50 questions/request, difficulty split ~25/35/25/15%. Uses an **OpenAI-compatible chat completions endpoint** (DeepSeek): model `DEEPSEEK_MODEL` (default `deepseek-v4-flash`, fallback `deepseek-chat`), base URL `DEEPSEEK_BASE_URL` (default `https://opencode.ai/zen/go/v1`), JSON output via `response_format`. Retry (2×) on main model, then falls back. Disabled without `DEEPSEEK_API_KEY`.

@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'; // Import Link
 import '../styles/Forms.css';
 import '../pages/ProfilePage.css';
 import { API_BASE_URL } from '../config/api';
+import { AVATAR_COLORS, isInitialAvatar, getAvatarColor } from '../utils/avatar';
 import FeatureWishlistButton from '../components/FeatureWishlistButton';
 import { Crown, Flame, Trophy, Pencil, LogOut } from 'lucide-react';
 
@@ -113,6 +114,10 @@ const ProfilePage: React.FC = () => {
                             <div className="stat-value"><Trophy className="stat-icon" size={16} />{user.longest_win_streak || 0}</div>
                         </div>
                         <div className="stat-card">
+                            <div className="stat-label">Points</div>
+                            <div className="stat-value stat-value-gold">{user.points || 0} ⭐</div>
+                        </div>
+                        <div className="stat-card">
                             <div className="stat-label">Best Category</div>
                             <div className="stat-value stat-value-gold">
                                 {user.best_category ? `${user.best_category.category} (${user.best_category.count})` : '-'}
@@ -130,10 +135,15 @@ const ProfilePage: React.FC = () => {
                 {/* Avatar Display */}
                 <div className="profile-avatar-wrap">
                     <div className="profile-avatar">
-                        {user.avatar_url ? (
+                        {user.avatar_url && !isInitialAvatar(user.avatar_url) ? (
                             <img src={user.avatar_url} alt="Avatar" />
                         ) : (
-                            <span className="profile-avatar-fallback">{user.username.charAt(0).toUpperCase()}</span>
+                            <span
+                                className="profile-avatar-fallback"
+                                style={getAvatarColor(user.avatar_url) ? { backgroundColor: getAvatarColor(user.avatar_url) as string } : undefined}
+                            >
+                                {user.username.charAt(0).toUpperCase()}
+                            </span>
                         )}
                     </div>
                 </div>
@@ -146,8 +156,25 @@ const ProfilePage: React.FC = () => {
                             <input className="form-input" value={editName} onChange={e => setEditName(e.target.value)} />
                         </div>
                         <div className="form-group">
-                            <label>Avatar URL:</label>
-                            <input className="form-input" value={editAvatar} onChange={e => setEditAvatar(e.target.value)} placeholder="https://..." />
+                            <label>Avatar Color:</label>
+                            <div className="avatar-picker">
+                                {AVATAR_COLORS.map((color, i) => (
+                                    <button
+                                        key={i}
+                                        type="button"
+                                        className={`avatar-pick ${editAvatar === `initial:${i}` ? 'avatar-pick-active' : ''}`}
+                                        style={{ backgroundColor: color }}
+                                        onClick={() => setEditAvatar(`initial:${i}`)}
+                                        title={`Avatar ${i + 1}`}
+                                    >
+                                        {editAvatar === `initial:${i}` ? '✓' : ''}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                        <div className="form-group">
+                            <label>Avatar URL (optional — overrides color):</label>
+                            <input className="form-input" value={isInitialAvatar(editAvatar) ? '' : editAvatar} onChange={e => setEditAvatar(e.target.value)} placeholder="https://..." />
                         </div>
                         <div className="profile-actions">
                             <button onClick={handleUpdate} className="form-submit-btn">Save</button>
