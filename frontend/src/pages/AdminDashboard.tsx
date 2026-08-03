@@ -12,6 +12,7 @@ import {
     deleteUser,
     updateQuestionStatus,
     updateCategoryStatus,
+    fillCategoryPool,
     updateAllQuestionsStatus,
     regenerateQuestions,
     updateQuestionDifficulty,
@@ -272,6 +273,16 @@ const AdminDashboard: React.FC = () => {
         }
     };
 
+    const handleFillCategory = async (category: string) => {
+        try {
+            const result = await fillCategoryPool(category, adminPassword);
+            setDeleteMessage(result.message || `Generation started for "${category}"`);
+            setTimeout(() => setDeleteMessage(''), 3000);
+        } catch (error) {
+            setDeleteMessage('Error starting generation');
+        }
+    };
+
     const handleUpdateAllStatus = async (isActive: boolean) => {
         if (!window.confirm(`Are you sure you want to ${isActive ? 'ACTIVATE' : 'ARCHIVE'} ALL QUESTIONS GLOBALLY? This is a major action.`)) return;
 
@@ -392,6 +403,13 @@ const AdminDashboard: React.FC = () => {
                                         onClick={() => handleUpdateCategoryStatus(category, true)}
                                     >
                                         <Check size={12} />
+                                    </button>
+                                    <button
+                                        className="btn small-btn admin-icon-btn"
+                                        title="Fill pool with AI-generated questions"
+                                        onClick={() => handleFillCategory(category)}
+                                    >
+                                        <RefreshCw size={12} />
                                     </button>
                                 </div>
                             ))}

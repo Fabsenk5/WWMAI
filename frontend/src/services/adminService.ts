@@ -48,6 +48,15 @@ export const deleteQuestionsByCategories = async (categories: string[], password
     return response.json();
 };
 
+export const fillCategoryPool = async (category: string, password: string): Promise<{ success: boolean; message: string }> => {
+    const response = await fetch(`${API_URL}/categories/fill`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ category, password }),
+    });
+    return response.json();
+};
+
 export const listQuestions = async (password: string, page: number = 1, limit: number = 20, category?: string, difficulty?: string, isActive?: boolean): Promise<QuestionsResponse> => {
     let url = `${API_URL}/questions?password=${encodeURIComponent(password)}&page=${page}&limit=${limit}`;
     if (category) url += `&category=${encodeURIComponent(category)}`;

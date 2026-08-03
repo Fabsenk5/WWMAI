@@ -194,10 +194,15 @@ export class QuestionModel {
                 query += ` WHERE ${conditions.join(' AND ')}`;
             }
 
+            // Rotation: never/least-recently used questions are strongly preferred
+            // (soft weighting — nothing is excluded absolutely). NULL last_used_at
+            // counts as ~30 days old so fresh questions come first.
+            const rotationOrder = `ORDER BY (RANDOM() * (1 + COALESCE(EXTRACT(EPOCH FROM (NOW() - last_used_at)) / 86400.0, 30))) DESC`;
+
             // Diversity: when the round already used questions (with embeddings),
             // fetch extra candidates and spread them semantically in JS.
             const useDiversity = usedEmbeddings.length > 0;
-            query += ' ORDER BY RANDOM() LIMIT $' + paramIndex;
+            query += ` ${rotationOrder} LIMIT $` + paramIndex;
             params.push(useDiversity ? Math.max(limit * 3, 30) : limit);
 
             // Execute the query
@@ -239,7 +244,19 @@ export class QuestionModel {
      */
     async getRandomQuestionByDifficulty(difficulty: string | null, excludeIds: number[] = [], categories: string[] | null = null, usedEmbeddings: number[][] = []) {
         const questions = await this.getQuestionsByDifficulty(difficulty, excludeIds, 1, categories, usedEmbeddings);
-        return questions.length > 0 ? questions[0] : null;
+        const question = questions.length > 0 ? questions[0] : null;
+        if (question && question.id) {
+            // Track usage so the pool rotates across rounds (soft weighting)
+            try {
+                await this.db.query(
+                    `UPDATE questions SET last_used_at = NOW(), times_used = times_used + 1 WHERE id = $1`,
+                    [question.id]
+                );
+            } catch (err) {
+                console.warn('[QuestionModel] Failed to update last_used_at:', err);
+            }
+        }
+        return question;
     }
 
     /**

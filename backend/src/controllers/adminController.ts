@@ -141,6 +141,28 @@ export class AdminController {
     }
 
     /**
+     * Trigger AI generation for a single category (fills the pool towards the target)
+     */
+    fillCategoryPool = async (req: Request, res: Response) => {
+        const { category, password } = req.body;
+        if (password !== this.adminPassword) {
+            res.status(401).json({ error: 'Unauthorized: Invalid password' });
+            return;
+        }
+        if (!category || typeof category !== 'string') {
+            res.status(400).json({ error: 'Invalid category provided' });
+            return;
+        }
+
+        // Fire-and-forget so the dashboard stays responsive; generation happens
+        // in the background (ensureCategoryPool respects the 6h cooldown)
+        this.aiService.ensureCategoryPool(category, 150).catch(err => {
+            console.error(`[Admin] Background pool fill failed for "${category}":`, err);
+        });
+        res.json({ success: true, message: `Pool generation started for "${category}"` });
+    }
+
+    /**
      * List all questions with pagination and filtering
      */
     listQuestions = async (req: Request, res: Response) => {

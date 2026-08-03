@@ -20,6 +20,7 @@ export function createAdminRouter(pool: Pool): Router {
     router.post('/questions/status', adminController.updateQuestionStatus);
     router.post('/questions/:id/difficulty', adminController.updateQuestionDifficulty);
     router.post('/categories/status', adminController.updateCategoryStatus);
+    router.post('/categories/fill', adminController.fillCategoryPool);
     router.post('/questions/all-status', adminController.updateAllQuestionsStatus);
     router.post('/questions/regenerate', adminController.regenerateQuestions);
 

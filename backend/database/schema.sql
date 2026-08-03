@@ -38,6 +38,8 @@ CREATE TABLE questions (
     translations JSONB DEFAULT '{}',
     is_active BOOLEAN DEFAULT TRUE,
     embedding REAL[],
+    last_used_at TIMESTAMP WITH TIME ZONE,
+    times_used INT DEFAULT 0,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT unique_question UNIQUE (category, question, difficulty)
 );
