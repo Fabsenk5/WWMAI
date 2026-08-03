@@ -23,6 +23,7 @@ export function createAdminRouter(pool: Pool): Router {
     router.post('/categories/fill', adminController.fillCategoryPool);
     router.post('/questions/all-status', adminController.updateAllQuestionsStatus);
     router.post('/questions/regenerate', adminController.regenerateQuestions);
+    router.post('/questions/cleanup-similar', adminController.runSimilarityCleanup);
 
     // User Management
     router.get('/users', adminController.getAllUsers);

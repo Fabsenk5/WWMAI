@@ -509,4 +509,24 @@ export class AdminController {
             res.status(500).json({ error: 'Failed to regenerate questions' });
         }
     }
+
+    /**
+     * Run the similarity cleanup on demand (embedding backfill + deactivate near-duplicates)
+     */
+    runSimilarityCleanup = async (req: Request, res: Response) => {
+        const { password } = req.body;
+        if (password !== this.adminPassword) {
+            res.status(401).json({ error: 'Unauthorized: Invalid password' });
+            return;
+        }
+
+        // Fire-and-forget: backfill + deactivation runs in the background
+        import('../database/cleanupSimilarQuestions').then(async (mod) => {
+            await mod.cleanupSimilarQuestions();
+        }).catch(err => {
+            console.error('[AdminController] Similarity cleanup failed:', err);
+        });
+
+        res.json({ success: true, message: 'Similarity cleanup started in background.' });
+    }
 }

@@ -13,6 +13,7 @@ import {
     updateQuestionStatus,
     updateCategoryStatus,
     fillCategoryPool,
+    runSimilarityCleanup,
     updateAllQuestionsStatus,
     regenerateQuestions,
     updateQuestionDifficulty,
@@ -311,6 +312,16 @@ const AdminDashboard: React.FC = () => {
         }
     };
 
+    const handleSimilarityCleanup = async () => {
+        try {
+            const result = await runSimilarityCleanup(adminPassword);
+            setSettingsMessage(result.message || 'Similarity cleanup started');
+            setTimeout(() => setSettingsMessage(''), 5000);
+        } catch (error) {
+            setSettingsMessage('Error starting cleanup');
+        }
+    };
+
     return (
         <div className="admin-dashboard-container">
             <div className="admin-header">
@@ -361,6 +372,12 @@ const AdminDashboard: React.FC = () => {
                     onClick={handleRegenerate}
                 >
                     <RefreshCw size={14} /> Archive & Regenerate All
+                </button>
+                <button
+                    className="btn btn-secondary"
+                    onClick={handleSimilarityCleanup}
+                >
+                    <RefreshCw size={14} /> Similarity Cleanup
                 </button>
                 <button
                     className="btn btn-danger"

@@ -146,6 +146,15 @@ if (process.env.NODE_ENV !== 'test') {
         });
     }, QUESTION_CLEANUP_INTERVAL_MS);
     console.log('[App] Scheduled question pool maintenance (cleanup + fill) to run every 24 hours.');
+
+    // Initial embedding backfill + near-duplicate cleanup shortly after boot —
+    // otherwise similar legacy questions stay active until the first 24h run
+    setTimeout(() => {
+        cleanupSimilarQuestions().catch(err => {
+            console.error('[App] Initial similarity cleanup failed:', err);
+        });
+    }, 60 * 1000);
+    console.log('[App] Initial question similarity cleanup scheduled 60s after boot.');
 }
 
 interface JoinRoomPayload {
