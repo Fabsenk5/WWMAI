@@ -183,6 +183,44 @@
     margin-bottom: 16px;
 }
 
+/* Answer countdown (mirrors the server-side 45s round timeout) */
+.answer-timer {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    width: 100%;
+    padding: 8px 16px;
+    margin-bottom: 16px;
+    border-radius: var(--radius-full);
+    background: var(--bg-inset);
+    border: 1px solid var(--border-strong);
+    color: var(--text-secondary);
+    font-family: var(--font-body);
+    font-weight: 700;
+    font-size: 1rem;
+    letter-spacing: 0.5px;
+}
+
+.answer-timer-warning {
+    color: #fff;
+    background: var(--danger-color);
+    border-color: var(--danger-color);
+    box-shadow: 0 0 16px var(--danger-soft);
+    animation: timerPulse 1s ease-in-out infinite;
+}
+
+@keyframes timerPulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.6; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .answer-timer-warning {
+        animation: none;
+    }
+}
+
 .question-meta-badge {
     padding: 5px 14px;
     background-color: var(--accent-soft);

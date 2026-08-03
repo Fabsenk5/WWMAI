@@ -106,6 +106,9 @@ export class GameController {
     private async advanceToNextQuestion(roomCode: string, gameId: number, currentLevel: number): Promise<void> {
         this.clearRoomTimer(roomCode); // ensure no stale timers for this room
         try {
+            // 50:50 removals only apply to the question they were used on
+            await this.db.query(`UPDATE games SET jokers_5050_removed = '{}' WHERE room_code = $1`, [roomCode]);
+            await this.db.query(`UPDATE players SET jokers_5050_removed = '{}' WHERE room_code = $1`, [roomCode]);
             console.log(`Advancing game in room ${roomCode} from level ${currentLevel} to ${currentLevel + 1}`);
 
             // Check if it was the last level
@@ -152,11 +155,15 @@ export class GameController {
                 console.warn('[advanceToNextQuestion] Failed to load used embeddings:', embErr);
             }
 
-            // Fetch game categories and difficulty
-            const gameQuery = `SELECT selected_categories, difficulty_mode FROM games WHERE game_id = $1`;
+            // Fetch game categories, difficulty and round config
+            const gameQuery = `SELECT selected_categories, difficulty_mode, player_count, lives, wait_time FROM games WHERE game_id = $1`;
             const gameResult = await this.db.query(gameQuery, [gameId]);
-            const categories = gameResult.rows[0]?.selected_categories || null;
-            const difficultyMode = gameResult.rows[0]?.difficulty_mode || 'standard';
+            const gameRow = gameResult.rows[0] || {};
+            const categories = gameRow.selected_categories || null;
+            const difficultyMode = gameRow.difficulty_mode || 'standard';
+            const playerCount = gameRow.player_count ?? 10;
+            const gameLives = gameRow.lives ?? 3;
+            const waitTimeInfo = gameRow.wait_time ?? 15;
 
             // Fetch the next question
             const nextLevel = currentLevel + 1;
@@ -202,12 +209,17 @@ export class GameController {
                 questionTranslations: questionTranslations, // Safe translations for question text only
                 level: nextLevel,
                 prize: getPrizeForLevel(nextLevel),
-                options: options // Now containing { text, translations } objects
+                options: options, // Now containing { text, translations } objects
+                answerDeadline: Date.now() + GameController.QUESTION_TIMEOUT_MS
             };
 
             // Emit newQuestion event
             console.log(`Emitting newQuestion event for level ${nextLevel} in room ${roomCode}`);
             this.io.to(roomCode).emit('newQuestion', questionToSendToSocket);
+
+            // Arm the round timer as soon as the question is broadcast (deadline
+            // matches answerDeadline in the payload so clients show the same countdown)
+            this.startRoundTimer(roomCode, gameId, nextLevel, waitTimeInfo, nextQuestion.correct_answer, playerCount, gameLives);
 
         } catch (error) {
             console.error('Error in advanceToNextQuestion:', error);
@@ -649,7 +661,7 @@ export class GameController {
     // Helper for Auto-Start
     private async tryAutoStart(roomCode: string): Promise<void> {
         try {
-            const gameCheckQuery = 'SELECT game_id, status, selected_categories, difficulty_mode FROM games WHERE room_code = $1';
+            const gameCheckQuery = 'SELECT game_id, status, selected_categories, difficulty_mode, player_count, lives, wait_time FROM games WHERE room_code = $1';
             const gameCheckResult = await this.db.query(gameCheckQuery, [roomCode]);
 
             if (gameCheckResult.rows.length === 0) return;
@@ -694,13 +706,16 @@ export class GameController {
                 questionTranslations: questionTranslations,
                 level: 1,
                 prize: getPrizeForLevel(1),
-                options: options
+                options: options,
+                answerDeadline: Date.now() + GameController.QUESTION_TIMEOUT_MS
             };
 
             this.io.to(roomCode).emit('gameStarted', { message: 'Game Auto-Started! Room Full.' });
 
             setTimeout(() => {
                 this.io.to(roomCode).emit('newQuestion', questionData);
+                // Arm the round timer when the first question is actually broadcast
+                this.startRoundTimer(roomCode, game.game_id, 1, game.wait_time ?? 15, firstQuestion.correct_answer, game.player_count ?? 10, game.lives ?? 3);
             }, 2000);
 
         } catch (error) {
@@ -713,6 +728,7 @@ export class GameController {
     public async startGame(req: Request, res: Response): Promise<void> {
         let firstQuestion: any = null; // Declare firstQuestion here to make it accessible in the broader scope
         let hostId: any = null; // Declare hostId here to make it accessible after the transaction
+        let gameStartConfig: { gameId: number; playerCount: number; lives: number; waitTimeInfo: number } | null = null;
         const { roomCode } = req.params;
         const requestingUserId = (req as any).user?.userId ?? req.body?.userId;
         console.log('startGame method invoked with roomCode:', roomCode);
@@ -727,7 +743,7 @@ export class GameController {
         try {
             await client.query('BEGIN');
 
-            const gameCheckQuery = 'SELECT game_id, status, selected_categories, difficulty_mode, host_id FROM games WHERE room_code = $1';
+            const gameCheckQuery = 'SELECT game_id, status, selected_categories, difficulty_mode, host_id, player_count, lives, wait_time FROM games WHERE room_code = $1';
             const gameCheckResult = await client.query(gameCheckQuery, [roomCode]);
 
             if (gameCheckResult.rows.length === 0) {
@@ -738,6 +754,12 @@ export class GameController {
 
             const game = gameCheckResult.rows[0];
             hostId = game.host_id;
+            gameStartConfig = {
+                gameId: game.game_id,
+                playerCount: game.player_count ?? 10,
+                lives: game.lives ?? 3,
+                waitTimeInfo: game.wait_time ?? 15,
+            };
 
             // Only the host may start the game (guest-hosted rooms stay open)
             if (hostId !== null && hostId !== undefined
@@ -843,7 +865,8 @@ export class GameController {
             questionTranslations: questionTranslations, // Add translations
             level: 1, // current_level was set to 1
             prize: getPrizeForLevel(1), // Use the standalone function directly
-            options: options
+            options: options,
+            answerDeadline: Date.now() + GameController.QUESTION_TIMEOUT_MS
         };
 
         // Payload for the HTTP response to the host, including correct answer
@@ -862,6 +885,11 @@ export class GameController {
 
         console.log('startGame: Broadcasting newQuestion event to room:', roomCode, 'with question ID:', questionToSendToSocket.id);
         this.io.to(roomCode).emit('newQuestion', questionToSendToSocket);
+
+        // Arm the round timer as soon as the first question is broadcast
+        if (gameStartConfig) {
+            this.startRoundTimer(roomCode, gameStartConfig.gameId, 1, gameStartConfig.waitTimeInfo, firstQuestion.correct_answer, gameStartConfig.playerCount, gameStartConfig.lives);
+        }
 
         res.status(200).json({
             message: 'Game started successfully',
@@ -1275,7 +1303,7 @@ export class GameController {
             }
 
             // Get game state
-            const gameQuery = `SELECT game_id, current_question_id, game_mode, jokers_used as team_jokers FROM games WHERE room_code = $1 AND status = 'started'`;
+            const gameQuery = `SELECT game_id, current_question_id, game_mode, jokers_used as team_jokers, jokers_5050_removed as team_5050_removed FROM games WHERE room_code = $1 AND status = 'started'`;
             const gameResult = await this.db.query(gameQuery, [roomCode]);
 
             if (gameResult.rows.length === 0) {
@@ -1283,7 +1311,7 @@ export class GameController {
                 return;
             }
 
-            const { game_id, current_question_id, game_mode, team_jokers } = gameResult.rows[0];
+            const { game_id, current_question_id, game_mode, team_jokers, team_5050_removed } = gameResult.rows[0];
 
             if (!current_question_id) {
                 res.status(409).json({ error: 'No active question.' });
@@ -1292,6 +1320,8 @@ export class GameController {
 
             // Check if joker used
             console.log(`[useJoker] User: ${userId}, Type: ${jokerType}, Mode: ${game_mode}`);
+
+            let player5050Removals: string[] = [];
 
             if (game_mode === 'cooperative') {
                 const used = team_jokers || [];
@@ -1305,7 +1335,7 @@ export class GameController {
                 // Survival
                 // FIXED: players.game_id is never populated — lookup by room_code
                 // (unique via UNIQUE(userId, room_code)) instead of game_id
-                const playerQuery = `SELECT jokers_used FROM players WHERE userId = $1 AND room_code = $2`;
+                const playerQuery = `SELECT jokers_used, jokers_5050_removed FROM players WHERE userId = $1 AND room_code = $2`;
                 const playerResult = await this.db.query(playerQuery, [userId, roomCode]);
                 if (playerResult.rows.length === 0) {
                     res.status(404).json({ error: 'Player not found in this game.' });
@@ -1319,7 +1349,13 @@ export class GameController {
                     res.status(403).json({ error: 'You have already used this joker.' });
                     return;
                 }
+                player5050Removals = playerResult.rows[0].jokers_5050_removed || [];
             }
+
+            // 50:50 removals (for chained audience/phone jokers on the same question)
+            const stored5050Removals: string[] = game_mode === 'cooperative'
+                ? (team_5050_removed || [])
+                : player5050Removals;
 
             // Fetch Question Data
             const questionQuery = `SELECT * FROM questions WHERE id = $1`;
@@ -1331,11 +1367,19 @@ export class GameController {
             // LOGIC BY TYPE
             if (jokerType === '5050') {
                 // Return 2 incorrect answers
-                const incorrect = question.incorrect_answers;
+                const incorrect = [...question.incorrect_answers];
                 const shuffledIncorrect = incorrect.sort(() => 0.5 - Math.random());
+                const toRemove = shuffledIncorrect.slice(0, 2);
                 payload = {
-                    wrongAnswersToRemove: shuffledIncorrect.slice(0, 2)
+                    wrongAnswersToRemove: toRemove
                 };
+                // Store removals so chained audience/phone jokers only see the
+                // two remaining options (cleared on the next question)
+                if (game_mode === 'cooperative') {
+                    await this.db.query(`UPDATE games SET jokers_5050_removed = $1 WHERE game_id = $2`, [toRemove, game_id]);
+                } else {
+                    await this.db.query(`UPDATE players SET jokers_5050_removed = $1 WHERE userId = $2 AND room_code = $3`, [toRemove, userId, roomCode]);
+                }
             } else if (jokerType === 'audience') {
                 // Simulate Audience
                 const difficulty = question.difficulty;
@@ -1353,11 +1397,17 @@ export class GameController {
                     minVote = 51;
                 }
 
-                const options = this.getConsistentOptions(
+                const allOptions = this.getConsistentOptions(
                     question.id,
                     [...question.incorrect_answers, question.correct_answer],
                     question.translations
                 );
+                // If 50:50 was used on this question, only the 2 remaining options poll
+                const activeRemovals = stored5050Removals.filter((r: string) => allOptions.some((o: any) => o.text === r));
+                const options = activeRemovals.length > 0
+                    ? allOptions.filter((o: any) => !activeRemovals.includes(o.text))
+                    : allOptions;
+
                 const stats: Record<string, number> = {};
                 let remaining = 100;
 
@@ -1399,8 +1449,6 @@ export class GameController {
                         stats[opt.text] = remaining;
                     } else {
                         // Give a random chunk of the remaining
-                        // Ensure we leave at least 0 for others? actually random * remaining is fine
-                        // But let's avoid giving 0 too often if possible, though random is fine.
                         const val = Math.floor(Math.random() * (remaining + 1));
                         stats[opt.text] = val;
                         remaining -= val;
@@ -1421,10 +1469,24 @@ export class GameController {
                 else if (difficulty === 'hard' && hit > 0.45) isCorrect = true;
                 else if (difficulty === 'very_hard' && hit > 0.6) isCorrect = true;
 
+                // If 50:50 was used, the friend can only choose from the 2 remaining options
+                let wrongOption = question.incorrect_answers[0];
+                if (stored5050Removals.length > 0) {
+                    const allOptions = this.getConsistentOptions(
+                        question.id,
+                        [...question.incorrect_answers, question.correct_answer],
+                        question.translations
+                    );
+                    const activeRemovals = stored5050Removals.filter((r: string) => allOptions.some((o: any) => o.text === r));
+                    const remainingOptions = allOptions.filter((o: any) => !activeRemovals.includes(o.text));
+                    const wrong = remainingOptions.find((o: any) => o.text !== question.correct_answer);
+                    if (wrong) wrongOption = wrong.text;
+                }
+
                 payload = {
                     message: isCorrect
                         ? `I'm pretty sure it's "${question.correct_answer}".`
-                        : `I'm not sure, maybe "${question.incorrect_answers[0]}"?`
+                        : `I'm not sure, maybe "${wrongOption}"?`
                 };
             }
 

@@ -24,6 +24,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
     const [isMuted, setIsMuted] = useState(false); // Add mute state
     const audioRef = useRef<HTMLAudioElement | null>(null);
+    const sfxRef = useRef<HTMLAudioElement[]>([]); // running SFX elements (stopped on stopAll/new SFX)
     const [currentTrack] = useState('/assets/audio/background_loop.mp3');
 
     // Refs for stable access in callbacks
@@ -65,8 +66,13 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         if (audioRef.current) {
             audioRef.current.pause();
             audioRef.current = null;
-            setIsPlaying(false);
         }
+        // Also stop any running SFX so they cannot overlap the next track
+        sfxRef.current.forEach(a => {
+            try { a.pause(); } catch { /* noop */ }
+        });
+        sfxRef.current = [];
+        setIsPlaying(false);
     }, []);
 
     const playTrack = useCallback((trackName: string, loop: boolean = true) => {
@@ -78,9 +84,16 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             const audio = new Audio(path);
             audio.loop = loop;
             audio.volume = isMutedRef.current ? 0 : (volumeRef.current * MASTER_VOLUME);
-            audio.play().catch(e => console.warn(`[Audio] Failed to play track ${trackName}:`, e));
             audioRef.current = audio;
+            const playPromise = audio.play();
             setIsPlaying(true);
+            // Autoplay can be rejected (browser policy) — only report playing on success
+            if (playPromise) {
+                playPromise.catch(e => {
+                    console.warn(`[Audio] Failed to play track ${trackName}:`, e);
+                    setIsPlaying(false);
+                });
+            }
         } catch (err) {
             console.error('[Audio] Error in playTrack:', err);
         }
@@ -88,30 +101,64 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     const playSFX = useCallback((trackName: string) => {
         try {
+            // Stop any running SFX first so round sounds never overlap
+            sfxRef.current.forEach(a => {
+                try { a.pause(); } catch { /* noop */ }
+            });
+            sfxRef.current = [];
+
             const path = `/assets/audio/${trackName}`;
             const audio = new Audio(path);
             audio.loop = false;
             audio.volume = isMutedRef.current ? 0 : (volumeRef.current * MASTER_VOLUME); // Use global volume
-            audio.play().catch(e => console.warn(`[Audio] Failed to play SFX ${trackName}:`, e));
+            sfxRef.current.push(audio);
+            audio.addEventListener('ended', () => {
+                sfxRef.current = sfxRef.current.filter(a => a !== audio);
+            });
+            const playPromise = audio.play();
+            if (playPromise) {
+                playPromise.catch(e => console.warn(`[Audio] Failed to play SFX ${trackName}:`, e));
+            }
         } catch (err) {
             console.error('[Audio] Error in playSFX:', err);
         }
     }, []);
 
     const togglePlay = useCallback(() => {
-        if (!audioRef.current) return;
+        // No track yet (e.g. autoplay was blocked on mount): start the main theme
+        if (!audioRef.current) {
+            playTrack('01 Main Theme.mp3', true);
+            return;
+        }
 
         if (!audioRef.current.paused) {
             audioRef.current.pause();
             setIsPlaying(false);
         } else {
-            audioRef.current.play().catch(err => console.log("Auto-play prevented:", err));
+            const playPromise = audioRef.current.play();
             setIsPlaying(true);
+            if (playPromise) {
+                playPromise.catch(err => {
+                    console.warn('[Audio] Auto-play prevented:', err);
+                    setIsPlaying(false);
+                });
+            }
         }
-    }, []);
+    }, [playTrack]);
 
     const toggleMute = useCallback(() => {
-        setIsMuted(prev => !prev);
+        setIsMuted(prev => {
+            const next = !prev;
+            // Apply immediately to the running track and SFX
+            const targetVolume = next ? 0 : (volumeRef.current * MASTER_VOLUME);
+            if (audioRef.current) {
+                audioRef.current.volume = targetVolume;
+            }
+            sfxRef.current.forEach(a => {
+                a.volume = targetVolume;
+            });
+            return next;
+        });
     }, []);
 
     const setVolume = useCallback((vol: number) => {

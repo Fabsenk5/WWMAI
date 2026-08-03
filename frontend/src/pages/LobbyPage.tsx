@@ -8,7 +8,7 @@ import { useModal } from '../context/ModalContext';
 import { useAudio } from '../context/AudioContext';
 import io, { Socket } from 'socket.io-client';
 import axios from 'axios';
-import { Heart, Skull, Trophy, Split, Users, Phone, UserX, CheckCircle2, XCircle, EyeOff } from 'lucide-react';
+import { Heart, Skull, Trophy, Split, Users, Phone, UserX, CheckCircle2, XCircle, EyeOff, Timer } from 'lucide-react';
 import './LobbyPage.css'; // Import the new CSS file
 import { API_BASE_URL } from '../config/api';
 
@@ -37,6 +37,7 @@ interface QuestionPayload {
   status?: string;
   userHasAnswered?: boolean;
   userAnswer?: string;
+  answerDeadline?: number;
 }
 
 const getSafeStorage = (key: string) => {
@@ -74,10 +75,38 @@ const LobbyPage: React.FC = () => {
 
   const [jokerResult, setJokerResult] = useState<{ wrongAnswersToRemove?: string[] } | null>(null);
 
+  // Question answer timer (mirrors the server-side 45s round timeout)
+  const [answerDeadline, setAnswerDeadline] = useState<number | null>(null);
+  const [answerTimeLeft, setAnswerTimeLeft] = useState<number | null>(null);
+  const [pausedRemaining, setPausedRemaining] = useState<number | null>(null);
+
   // REMOVED early return here to avoid conditional hook execution error
 
   const socketRef = useRef<Socket | null>(null);
   const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const pendingTrackTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const answerDeadlineRef = useRef<number | null>(null);
+  const pausedRemainingRef = useRef<number | null>(null);
+
+  // Countdown toward the server's answer deadline (frozen while paused)
+  useEffect(() => {
+    answerDeadlineRef.current = answerDeadline;
+    if (!answerDeadline) {
+      setAnswerTimeLeft(null);
+      return;
+    }
+    const tick = () => {
+      if (gameData?.status === 'paused') return;
+      setAnswerTimeLeft(Math.max(0, Math.ceil((answerDeadline - Date.now()) / 1000)));
+    };
+    tick();
+    const interval = setInterval(tick, 500);
+    return () => clearInterval(interval);
+  }, [answerDeadline, gameData?.status]);
+
+  useEffect(() => {
+    pausedRemainingRef.current = pausedRemaining;
+  }, [pausedRemaining]);
 
   const setGameDataFromContext = setGameData!;
 
@@ -174,23 +203,23 @@ const LobbyPage: React.FC = () => {
       setSelectedAnswer(null);
       setWaitingForCount(null);
       setJokerResult(null);
+      setAnswerDeadline(question.answerDeadline || null);
+      setPausedRemaining(null);
 
       // Audio: Play background loop for level
-      // If it's level 1, play "Let's Play" first? Or just loop question theme.
-      // Plan says: Let's Play > Bg Loop.
+      // Level 1 plays the "Let's Play" intro stinger first, then the level loop.
       const level = question.level || 1;
       const bgTrack = getAudioForLevel(level, 'question');
 
-      // If it is the VERY first question (level 1), maybe play "Let's Play" intro stinger?
-      // "10 Let's Play.mp3"
       if (level === 1) {
-        playTrack('10 Let\'s Play.mp3', false); // Intro
-        setTimeout(() => {
-          playTrack(bgTrack, true); // Loop
-        }, 4000); // Intro is approx 20s but maybe too long to wait? Let's just start loop after short delay or immediately. 
-        // User list says "Let's Play" is 20s. "Let's Play $2,000" is 11s.
-        // Ideally we queue it. For now, simple transition.
-        playTrack(bgTrack, true);
+        playTrack('10 Let\'s Play.mp3', false); // Intro stinger
+        if (pendingTrackTimeoutRef.current) {
+          clearTimeout(pendingTrackTimeoutRef.current);
+        }
+        pendingTrackTimeoutRef.current = setTimeout(() => {
+          playTrack(bgTrack, true); // Level loop after the intro
+          pendingTrackTimeoutRef.current = null;
+        }, 4000);
       } else {
         playTrack(bgTrack, true);
       }
@@ -218,6 +247,8 @@ const LobbyPage: React.FC = () => {
       setRevealedAnswers(data);
       setTeamAnswerInfo({ answer: data.teamAnswer, isCorrect: data.isTeamCorrect });
       setCountdown(data.timeToNextQuestion);
+      setAnswerDeadline(null); // round over — stop the answer countdown
+      setPausedRemaining(null);
 
       // Audio: Win/Lose
       stopAll(); // Stop background tension
@@ -300,10 +331,19 @@ const LobbyPage: React.FC = () => {
     };
 
     const handleGamePaused = () => {
+      // Freeze the answer countdown with the remaining time
+      const deadline = answerDeadlineRef.current;
+      setPausedRemaining(deadline ? Math.max(0, deadline - Date.now()) : null);
+      setAnswerDeadline(null);
       setGameDataFromContext(prev => prev ? { ...prev, status: 'paused' } : null);
     };
 
     const handleGameResumed = () => {
+      const remaining = pausedRemainingRef.current;
+      if (remaining !== null) {
+        setAnswerDeadline(Date.now() + remaining);
+        setPausedRemaining(null);
+      }
       setGameDataFromContext(prev => prev ? { ...prev, status: 'started' } : null);
     };
 
@@ -384,6 +424,10 @@ const LobbyPage: React.FC = () => {
       if (countdownIntervalRef.current) {
         clearInterval(countdownIntervalRef.current);
         countdownIntervalRef.current = null;
+      }
+      if (pendingTrackTimeoutRef.current) {
+        clearTimeout(pendingTrackTimeoutRef.current);
+        pendingTrackTimeoutRef.current = null;
       }
     };
   }, [roomCode, setGameDataFromContext, navigate, getAudioForLevel, playSFX, playTrack, stopAll, showAlert, isLoading, user]);
@@ -704,6 +748,12 @@ const LobbyPage: React.FC = () => {
               : currentQuestion.question}
           </div>
 
+          {answerTimeLeft !== null && (
+            <div className={`answer-timer ${answerTimeLeft <= 10 ? 'answer-timer-warning' : ''}`}>
+              <Timer size={16} /> {answerTimeLeft}s
+            </div>
+          )}
+
           {/* Modal now handled by Context */}
 
           {(() => {
@@ -744,7 +794,7 @@ const LobbyPage: React.FC = () => {
                       <button
                         key={index}
                         onClick={() => setSelectedAnswer(optionText)}
-                        disabled={!isAlive || answerSubmitted || gameData?.status === 'paused'}
+                        disabled={!isAlive || answerSubmitted || gameData?.status === 'paused' || answerTimeLeft === 0}
                         className={`option-button ${selectedAnswer === optionText ? 'selected' : ''}`}
                       >
                         <span className="option-prefix">{prefix}</span> {optionDisplay}
@@ -755,7 +805,7 @@ const LobbyPage: React.FC = () => {
                 {!answerSubmitted && (
                   <button
                     onClick={handleAnswerSubmit}
-                    disabled={!selectedAnswer || !isAlive || gameData?.status === 'paused'}
+                    disabled={!selectedAnswer || !isAlive || gameData?.status === 'paused' || answerTimeLeft === 0}
                     className="submit-button"
                   >
                     {!isAlive ? t('btn_eliminated') : t('btn_submit')}

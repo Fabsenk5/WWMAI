@@ -59,6 +59,7 @@ CREATE TABLE games (
     difficulty_mode VARCHAR(20) DEFAULT 'standard',
     moderator_mode BOOLEAN DEFAULT FALSE,
     jokers_used TEXT[] DEFAULT '{}',
+    jokers_5050_removed TEXT[] DEFAULT '{}',
     last_active TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -70,6 +71,7 @@ CREATE TABLE players (
     score INT DEFAULT 0,
     lives INT DEFAULT 3,
     jokers_used TEXT[] DEFAULT '{}',
+    jokers_5050_removed TEXT[] DEFAULT '{}',
     game_id INT,
     joined_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
     UNIQUE (userId, room_code)

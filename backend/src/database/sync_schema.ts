@@ -111,6 +111,7 @@ export const syncDatabaseSchema = async () => {
         await addColumnIfNotExists('games', 'wait_time', 'INT DEFAULT 15');
         await addColumnIfNotExists('games', 'moderator_mode', 'BOOLEAN DEFAULT FALSE');
         await addColumnIfNotExists('games', 'jokers_used', "TEXT[] DEFAULT '{}'");
+        await addColumnIfNotExists('games', 'jokers_5050_removed', "TEXT[] DEFAULT '{}'");
 
         // Add missing columns for 'users'
         await addColumnIfNotExists('users', 'avatar_url', 'VARCHAR(255)');
@@ -143,6 +144,7 @@ export const syncDatabaseSchema = async () => {
         console.log('[Schema Sync] Verified players table.');
 
         await addColumnIfNotExists('players', 'jokers_used', "TEXT[] DEFAULT '{}'");
+        await addColumnIfNotExists('players', 'jokers_5050_removed', "TEXT[] DEFAULT '{}'");
         await addColumnIfNotExists('players', 'game_id', 'INT');
 
         // 5. Ensure 'player_answers' table exists
