@@ -42,7 +42,7 @@ export class GameController {
     // Per-room pending timers (question timeout + advance-to-next-question),
     // pausable by the host. Keyed by roomCode.
     private roomTimers: Map<string, PendingTimer> = new Map();
-    private static readonly QUESTION_TIMEOUT_MS = 45 * 1000;
+    private static readonly QUESTION_TIMEOUT_MS = 90 * 1000; // 1m30s per round
 
     // Helper to update stats
     private async finalizeGameStats(roomCode: string, gameMode: string, result: 'win' | 'loss', finalLevel: number): Promise<void> {
