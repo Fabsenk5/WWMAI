@@ -781,9 +781,15 @@ const LobbyPage: React.FC = () => {
                 <div className="game-over-stats">
                   {t('correct')}: {roundStats.correct}/{roundStats.total} · {t('price_money')}:{' '}
                   {(() => {
-                    const myUserId = getSafeStorage('userId');
-                    const me = players.find(p => p.userId === myUserId);
-                    return me?.score?.toLocaleString('de-DE') ?? '0';
+                    let score = 0;
+                    if (gameData?.game_mode === 'survival') {
+                      const myUserId = getSafeStorage('userId');
+                      score = players.find(p => p.userId === myUserId)?.score ?? 0;
+                    } else {
+                      // Co-op: all players share the team score
+                      score = players.reduce((max, p) => Math.max(max, p.score || 0), 0);
+                    }
+                    return score.toLocaleString('de-DE');
                   })()}€
                 </div>
                 <button className="leave-btn" onClick={() => navigate('/')}>
@@ -952,11 +958,6 @@ const LobbyPage: React.FC = () => {
           })()}
 
           <div className="question-box" key={currentQuestion.id}>
-            <div className="question-meta">
-              {currentQuestion.category && <span className="question-meta-badge">{currentQuestion.category}</span>}
-              <span className="question-meta-badge">{t('level')}: {currentQuestion.level}</span>
-              <span className="question-meta-badge">{t('price_money')}: {currentQuestion.prize?.toLocaleString('de-DE')}€</span>
-            </div>
             {(currentQuestion.questionTranslations && currentQuestion.questionTranslations[language])
               ? currentQuestion.questionTranslations[language]
               : currentQuestion.question}

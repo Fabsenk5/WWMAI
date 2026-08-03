@@ -382,9 +382,11 @@
 
 .option-button.selected {
     background: var(--grad-gold);
-    color: var(--text-inverse);
+    color: #141a2b;
     border-color: var(--accent-color);
     box-shadow: var(--shadow-gold);
+    font-weight: 700;
+    text-shadow: none;
 }
 
 .option-button.selected .option-prefix {
