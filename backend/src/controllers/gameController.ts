@@ -1619,8 +1619,9 @@ export class GameController {
             // MARK AS USED
             if (game_mode === 'cooperative') {
                 await this.db.query(`UPDATE games SET jokers_used = array_append(jokers_used, $1) WHERE game_id = $2`, [jokerType, game_id]);
-                // Broadcast to update all clients that team joker is used
-                this.io.to(roomCode).emit('jokerUsed', { jokerType, userId: 'TEAM' });
+                // Broadcast with the full result payload so the team-wide joker
+                // applies to EVERYONE (5050 removals, audience stats, phone answer)
+                this.io.to(roomCode).emit('jokerUsed', { jokerType, userId: 'TEAM', ...payload });
             } else {
                 await this.db.query(`UPDATE players SET jokers_used = array_append(jokers_used, $1) WHERE userId = $2 AND room_code = $3`, [jokerType, userId, roomCode]);
                 // Emit event so frontend plays audio and updates UI if needed

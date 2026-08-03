@@ -454,7 +454,7 @@ const LobbyPage: React.FC = () => {
       setChatMessages(prev => [...prev.slice(-49), { userId: data.userId, text: data.text }]);
     };
 
-    const handleJokerUsed = (data: { jokerType: string, userId: string }) => {
+    const handleJokerUsed = (data: { jokerType: string, userId: string, wrongAnswersToRemove?: string[], stats?: Record<string, number>, message?: string }) => {
       // Audio: Joker SFX
       if (data.jokerType === '5050') playSFX('67 50-50.mp3');
       if (data.jokerType === 'audience') playSFX('68 Ask The Audience.mp3');
@@ -465,6 +465,17 @@ const LobbyPage: React.FC = () => {
           if (!prev) return null;
           return { ...prev, jokers_used: [...(prev.jokers_used || []), data.jokerType] };
         });
+
+        // Team-scoped joker results apply to EVERYONE in co-op mode
+        if (data.jokerType === '5050' && data.wrongAnswersToRemove) {
+          setJokerResult({ wrongAnswersToRemove: data.wrongAnswersToRemove });
+        } else if (data.jokerType === 'audience' && data.stats) {
+          const stats = data.stats;
+          const content = Object.keys(stats).map(key => `${key}: ${stats[key]}%`).join('\n');
+          showModal({ title: 'Audience Poll Result', body: <div className="whitespace-pre">{content}</div>, hideCancel: true, confirmText: 'OK' });
+        } else if (data.jokerType === 'phone' && data.message) {
+          showModal({ title: 'Phone a Friend', body: data.message, hideCancel: true, confirmText: 'Thanks' });
+        }
       }
     };
 
@@ -532,7 +543,7 @@ const LobbyPage: React.FC = () => {
         pendingTrackTimeoutRef.current = null;
       }
     };
-  }, [roomCode, setGameDataFromContext, navigate, getAudioForLevel, playSFX, playTrack, stopAll, showAlert, isLoading, user]);
+  }, [roomCode, setGameDataFromContext, navigate, getAudioForLevel, playSFX, playTrack, stopAll, showAlert, showModal, isLoading, user]);
 
   const handleUseJoker = async (jokerType: string) => {
     if (!roomCode || !currentQuestion) return;
