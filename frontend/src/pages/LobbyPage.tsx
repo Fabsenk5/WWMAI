@@ -8,8 +8,11 @@ import { useModal } from '../context/ModalContext';
 import { useAudio } from '../context/AudioContext';
 import io, { Socket } from 'socket.io-client';
 import axios from 'axios';
-import { Heart, Skull, Trophy, Split, Users, Phone, UserX, CheckCircle2, XCircle, EyeOff, Timer, Link2, LogOut, WifiOff, RefreshCw, MessageSquare, Send } from 'lucide-react';
-import './LobbyPage.css'; // Import the new CSS file
+import { Heart, Skull, Trophy, Split, Users, Phone, UserX, CheckCircle2, XCircle, EyeOff, Timer, Link2, LogOut, WifiOff, RefreshCw } from 'lucide-react';
+import './LobbyPage.css';
+import '../styles/RoomSocial.css';
+import EmoteBar from '../components/EmoteBar';
+import RoomChat from '../components/RoomChat';
 import { API_BASE_URL } from '../config/api';
 import { isInitialAvatar, getAvatarColor } from '../utils/avatar';
 
@@ -90,9 +93,7 @@ const LobbyPage: React.FC = () => {
   // Emotes + chat
   const [emotes, setEmotes] = useState<{ id: number; userId: string; emote: string }[]>([]);
   const emoteIdRef = useRef(0);
-  const [chatOpen, setChatOpen] = useState(false);
   const [chatMessages, setChatMessages] = useState<{ userId: string; text: string }[]>([]);
-  const [chatInput, setChatInput] = useState('');
 
   // Personal round stats for the end-of-game summary
   const [roundStats, setRoundStats] = useState({ correct: 0, total: 0 });
@@ -163,7 +164,14 @@ const LobbyPage: React.FC = () => {
         if (qData && (qData.id || qData.question)) {
           setCurrentQuestion(qData);
           if (qData.answerDeadline) {
-            setAnswerDeadline(qData.answerDeadline);
+            if (qData.status === 'paused') {
+              // Game is paused: freeze the countdown with the remaining time so
+              // it is re-derived correctly on resume
+              setPausedRemaining(Math.max(0, qData.answerDeadline - Date.now()));
+              setAnswerDeadline(null);
+            } else {
+              setAnswerDeadline(qData.answerDeadline);
+            }
           }
           if (qData.userHasAnswered) {
             setSelectedAnswer(qData.userAnswer);
@@ -645,18 +653,18 @@ const LobbyPage: React.FC = () => {
     socketRef.current?.emit('playerEmote', { emote });
   };
 
-  const sendChat = () => {
-    const text = chatInput.trim();
-    if (!text) return;
-    socketRef.current?.emit('chatMessage', { text });
-    setChatMessages(prev => [...prev.slice(-49), { userId: getSafeStorage('userId') || 'me', text }]);
-    setChatInput('');
+  const sendChat = (text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    socketRef.current?.emit('chatMessage', { text: trimmed });
+    setChatMessages(prev => [...prev.slice(-49), { userId: getSafeStorage('userId') || 'me', text: trimmed }]);
   };
 
   const getPlayerName = (userId: string) => {
     const p = players.find(pl => pl.userId === userId);
     if (p) return p.name;
-    return userId === (getSafeStorage('userId') || '') ? 'Du' : userId;
+    if (userId === 'me' || userId === (getSafeStorage('userId') || '')) return 'Du';
+    return userId;
   };
 
   const handleAnswerSubmit = async () => {
@@ -958,11 +966,7 @@ const LobbyPage: React.FC = () => {
             </div>
           )}
 
-          <div className="emote-bar">
-            {['👍', '😂', '😱', '🎉', '😎', '🤔'].map(e => (
-              <button key={e} className="emote-btn" onClick={() => sendEmote(e)} title={`Send ${e}`}>{e}</button>
-            ))}
-          </div>
+          <EmoteBar onEmote={sendEmote} />
 
           {/* Modal now handled by Context */}
 
@@ -984,7 +988,7 @@ const LobbyPage: React.FC = () => {
                     <EyeOff size={18} /> You are eliminated (Spectator Mode)
                   </div>
                 )}
-                <div className="options-grid">
+                <div className="options-grid" key={`opts-${currentQuestion.id}`}>
                   {currentQuestion.options.map((option, index) => {
                     const isLegacy = typeof option === 'string';
                     const optionText = isLegacy ? option : option.text;
@@ -1095,32 +1099,7 @@ const LobbyPage: React.FC = () => {
         </div>
       </div>
 
-      <div className="chat-section">
-        <button className="chat-toggle" onClick={() => setChatOpen(!chatOpen)}>
-          <MessageSquare size={16} /> {t('chat')} {chatOpen ? '▾' : '▸'}
-        </button>
-        {chatOpen && (
-          <div className="chat-panel">
-            <div className="chat-messages">
-              {chatMessages.length === 0 && <div className="chat-empty">{t('chat_empty')}</div>}
-              {chatMessages.map((m, i) => (
-                <div key={i} className="chat-message"><strong>{getPlayerName(m.userId)}:</strong> {m.text}</div>
-              ))}
-            </div>
-            <div className="chat-input-row">
-              <input
-                className="form-input"
-                value={chatInput}
-                onChange={e => setChatInput(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') sendChat(); }}
-                placeholder={t('chat_placeholder')}
-                maxLength={200}
-              />
-              <button className="btn btn-primary btn-sm" onClick={sendChat}><Send size={14} /></button>
-            </div>
-          </div>
-        )}
-      </div>
+      <RoomChat messages={chatMessages} onSend={sendChat} getPlayerName={getPlayerName} />
     </div>
   );
 };

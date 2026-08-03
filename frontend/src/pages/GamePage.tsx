@@ -7,10 +7,13 @@ import { useAudio } from '../context/AudioContext';
 import { useAuth } from '../context/AuthContext'; // Added import
 import QuestionDisplay from '../components/QuestionDisplay';
 import Scoreboard from '../components/Scoreboard';
+import EmoteBar from '../components/EmoteBar';
+import RoomChat from '../components/RoomChat';
 import { API_BASE_URL } from '../config/api';
 import io from 'socket.io-client';
 import { Trophy, Skull, Flame, Users, PartyPopper, Ghost } from 'lucide-react';
 import '../styles/Game.css';
+import '../styles/RoomSocial.css';
 
 const GamePage: React.FC = () => {
   const { t } = useTranslation();
@@ -35,6 +38,7 @@ const GamePage: React.FC = () => {
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
   const [answerSubmitted, setAnswerSubmitted] = useState(false);
   const [questionError, setQuestionError] = useState<string | undefined>(undefined);
+  const [chatMessages, setChatMessages] = useState<{ userId: string; text: string }[]>([]);
   const socketRef = useRef<ReturnType<typeof io> | null>(null);
   const roomCode = gameData?.room_code;
 
@@ -201,6 +205,11 @@ const GamePage: React.FC = () => {
         setGameData(prev => prev ? { ...prev, status: 'started' } : prev);
       });
 
+      socket.on('chatMessage', (data: { userId: string; text: string }) => {
+        if (!data?.text) return;
+        setChatMessages(prev => [...prev.slice(-49), { userId: data.userId, text: data.text }]);
+      });
+
       // Cleanup on unmount or roomCode change
       return () => {
         if (socketRef.current) {
@@ -285,6 +294,24 @@ const GamePage: React.FC = () => {
         showAlert('Error starting game', 'Error');
       }
     }
+  };
+
+  const sendEmote = (emote: string) => {
+    socketRef.current?.emit('playerEmote', { emote });
+  };
+
+  const sendChat = (text: string) => {
+    const trimmed = text.trim();
+    if (!trimmed) return;
+    socketRef.current?.emit('chatMessage', { text: trimmed });
+    setChatMessages(prev => [...prev.slice(-49), { userId: user ? String(user.id) : (localStorage.getItem('userId') || 'me'), text: trimmed }]);
+  };
+
+  const getPlayerName = (userId: string) => {
+    const p = (gameData?.users || []).find(u => String(u.userId) === String(userId));
+    if (p) return p.name;
+    if (userId === 'me' || userId === String(user?.id)) return 'Du';
+    return userId;
   };
 
   const handlePauseToggle = async () => {
@@ -398,10 +425,13 @@ const GamePage: React.FC = () => {
               </button>
             </div>
           )}
+          <EmoteBar onEmote={sendEmote} />
         </div>
       )}
 
       <Scoreboard players={gameData?.users || []} gameEnded={gameEnded} />
+
+      <RoomChat messages={chatMessages} onSend={sendChat} getPlayerName={getPlayerName} />
     </div>
   );
 };

@@ -59,8 +59,9 @@ describe('GameController', () => {
                     { key: 'global_premium_unlocked', value: 'false' },
                     { key: 'global_guest_premium_unlocked', value: 'false' },
                 ],
-            })
-            .mockResolvedValueOnce({ rows: [{ game_id: 1, room_code: 'ABCD12' }] });
+            }) // system_settings
+            .mockResolvedValueOnce({ rows: [] }) // room code availability check
+            .mockResolvedValueOnce({ rows: [{ game_id: 1, room_code: 'ABCD12' }] }); // insert
 
         await gameController.createGame(mockReq as Request, mockRes as Response);
 
@@ -193,6 +194,63 @@ describe('GameController', () => {
         expect(mockDb.query).toHaveBeenCalledWith('SELECT * FROM games WHERE game_id = $1', ['5']);
         expect(mockRes.status).not.toHaveBeenCalledWith(404);
         expect(mockRes.json).toHaveBeenCalledWith({ ...mockGame, players: mockPlayers });
+    });
+
+    it('should leave a game', async () => {
+        mockReq.params = { roomCode: '1234' };
+        mockReq.body = { userId: 'player-1' };
+
+        mockDb.query
+            .mockResolvedValueOnce({ rowCount: 1, rows: [{ name: 'Player1' }] }) // DELETE player
+            .mockResolvedValueOnce({ rowCount: 1 }); // user_count sync
+
+        await gameController.leaveGame(mockReq as Request, mockRes as Response);
+
+        expect(mockDb.query).toHaveBeenCalledWith(
+            'DELETE FROM players WHERE userId = $1 AND room_code = $2 RETURNING name',
+            ['player-1', '1234']
+        );
+        expect(mockRes.status).toHaveBeenCalledWith(200);
+        expect(mockRes.json).toHaveBeenCalledWith({ message: 'Player left the game' });
+    });
+
+    it('should 404 when leaving a room as a non-member', async () => {
+        mockReq.params = { roomCode: '1234' };
+        mockReq.body = { userId: 'ghost' };
+        mockDb.query.mockResolvedValueOnce({ rowCount: 0, rows: [] });
+
+        await gameController.leaveGame(mockReq as Request, mockRes as Response);
+
+        expect(mockRes.status).toHaveBeenCalledWith(404);
+    });
+
+    it('should switch the question and emit questionSwitched', async () => {
+        mockReq.params = { roomCode: '1234' };
+        mockReq.body = { userId: 'player-1', jokerType: 'switch' };
+
+        const oldQuestion = { id: 10, category: 'Science', difficulty: 'easy', question: 'Old Q?', correct_answer: 'A', incorrect_answers: ['B', 'C', 'D'], translations: {} };
+        const newQuestion = { id: 11, category: 'Science', difficulty: 'easy', question: 'New Q?', correct_answer: 'X', incorrect_answers: ['Y', 'Z', 'W'], translations: {} };
+
+        mockDb.query
+            .mockResolvedValueOnce({
+                rows: [{
+                    game_id: 5, current_question_id: 10, current_level: 3, game_mode: 'cooperative',
+                    team_jokers: [], team_5050_removed: [], selected_categories: null,
+                    difficulty_mode: 'standard', wait_time: 15, player_count: 2, lives: 3,
+                }],
+            }) // gameQuery
+            .mockResolvedValueOnce({ rows: [oldQuestion] }) // questionQuery
+            .mockResolvedValueOnce({ rows: [] }) // used answers
+            .mockResolvedValue({ rows: [newQuestion] }); // questionModel fetch + updates
+
+        await gameController.useJoker(mockReq as Request, mockRes as Response);
+
+        // questionSwitched broadcast with the fresh question
+        expect(mockIo.to).toHaveBeenCalledWith('1234');
+        const roomEmit = (mockIo.to as jest.Mock).mock.results[0].value;
+        expect(roomEmit.emit).toHaveBeenCalledWith('questionSwitched', expect.objectContaining({ id: 11 }));
+        expect(mockRes.status).toHaveBeenCalledWith(200);
+        expect(mockRes.json).toHaveBeenCalledWith(expect.objectContaining({ switched: true, jokerType: 'switch' }));
     });
 
     it('should fetch game state by ID', async () => {

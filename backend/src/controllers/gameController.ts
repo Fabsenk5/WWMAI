@@ -556,7 +556,15 @@ export class GameController {
             const mode = gameMode || 'cooperative';
             const initialLives = lives || 3;
             const waitTime = req.body.waitTimer || 15;
-            const roomCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+            // Generate a unique room code (retry on the rare collision)
+            const generateRoomCode = () => Math.random().toString(36).substring(2, 8).toUpperCase();
+            let roomCode = generateRoomCode();
+            for (let attempt = 0; attempt < 3; attempt++) {
+                const existsRes = await this.db.query('SELECT 1 FROM games WHERE room_code = $1', [roomCode]);
+                if (existsRes.rows.length === 0) break;
+                roomCode = generateRoomCode();
+            }
 
             // Handle Categories - Combine both sources to trigger AI checks
             let selectedCategories: string[] = [];
@@ -1257,6 +1265,10 @@ export class GameController {
             // Get Correct Answer AND Category
             const questionQuery = `SELECT correct_answer, category FROM questions WHERE id = $1`;
             const questionResult = await this.db.query(questionQuery, [current_question_id]);
+            if (!questionResult.rows[0]) {
+                res.status(409).json({ error: 'Question no longer available.' });
+                return;
+            }
             const { correct_answer, category } = questionResult.rows[0];
             const isIndividualCorrect = answer === correct_answer;
 
@@ -1410,6 +1422,10 @@ export class GameController {
             const questionQuery = `SELECT * FROM questions WHERE id = $1`;
             const questionResult = await this.db.query(questionQuery, [current_question_id]);
             const question = questionResult.rows[0];
+            if (!question) {
+                res.status(409).json({ error: 'Question no longer available.' });
+                return;
+            }
 
             let payload: any = {};
 
@@ -1564,6 +1580,10 @@ export class GameController {
                     `UPDATE games SET current_question_id = $1, last_active = CURRENT_TIMESTAMP WHERE game_id = $2`,
                     [newQuestionId, game_id]
                 );
+
+                // 50:50 removals only apply to the question they were used on
+                await this.db.query(`UPDATE games SET jokers_5050_removed = '{}' WHERE room_code = $1`, [roomCode]);
+                await this.db.query(`UPDATE players SET jokers_5050_removed = '{}' WHERE room_code = $1`, [roomCode]);
 
                 const options = this.getConsistentOptions(
                     newQuestionId,

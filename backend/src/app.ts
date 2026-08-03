@@ -154,6 +154,19 @@ interface JoinRoomPayload {
     playerName?: string;
 }
 
+// Simple per-socket rate limiting for chat/emote spam (in-memory, entries expire)
+const rateBuckets = new Map<string, { count: number; resetAt: number }>();
+const isRateLimited = (key: string, limit: number, windowMs: number): boolean => {
+    const now = Date.now();
+    const bucket = rateBuckets.get(key);
+    if (!bucket || bucket.resetAt < now) {
+        rateBuckets.set(key, { count: 1, resetAt: now + windowMs });
+        return false;
+    }
+    bucket.count += 1;
+    return bucket.count > limit;
+};
+
 socketIoInstance.on('connection', (socket: Socket) => {
     console.log('A user connected:', socket.id);
 
@@ -206,22 +219,28 @@ socketIoInstance.on('connection', (socket: Socket) => {
 
     socket.on('playerEmote', (data: { emote: string }) => {
         const roomCode = socket.data.roomCode as string | undefined;
-        if (roomCode && data?.emote) {
-            socket.to(roomCode).emit('playerEmote', {
-                userId: socket.data.userId,
-                emote: String(data.emote).slice(0, 8),
-            });
+        if (!roomCode || !data?.emote) return;
+        if (isRateLimited(`emote:${socket.id}`, 20, 10 * 1000)) {
+            socket.emit('error', { message: 'Emote rate limit reached. Slow down!' });
+            return;
         }
+        socket.to(roomCode).emit('playerEmote', {
+            userId: socket.data.userId,
+            emote: String(data.emote).slice(0, 8),
+        });
     });
 
     socket.on('chatMessage', (data: { text: string }) => {
         const roomCode = socket.data.roomCode as string | undefined;
-        if (roomCode && data?.text) {
-            socket.to(roomCode).emit('chatMessage', {
-                userId: socket.data.userId,
-                text: String(data.text).slice(0, 200),
-            });
+        if (!roomCode || !data?.text) return;
+        if (isRateLimited(`chat:${socket.id}`, 10, 10 * 1000)) {
+            socket.emit('error', { message: 'Chat rate limit reached. Slow down!' });
+            return;
         }
+        socket.to(roomCode).emit('chatMessage', {
+            userId: socket.data.userId,
+            text: String(data.text).slice(0, 200),
+        });
     });
 
     socket.on('disconnect', () => {
