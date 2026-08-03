@@ -160,7 +160,7 @@ describe('GameController', () => {
         expect(mockRes.status).toHaveBeenCalledWith(401);
     });
 
-    it('should fetch a game by ID with players', async () => {
+    it('should fetch a game by ID with players (room_code first)', async () => {
         mockReq.params = { id: '1' };
         const mockGame = { game_id: 1, name: 'Test Game', player_count: 4, room_code: 'XYZ789', current_level: 1 };
         const mockPlayers = [{ name: 'PlayerA', score: 0, lives: 3 }];
@@ -171,8 +171,26 @@ describe('GameController', () => {
 
         await gameController.getGameById(mockReq as Request, mockRes as Response);
 
-        expect(mockDb.query).toHaveBeenCalledWith('SELECT * FROM games WHERE game_id = $1', ['1']);
+        expect(mockDb.query).toHaveBeenCalledWith('SELECT * FROM games WHERE room_code = $1', ['1']);
         expect(mockDb.query).toHaveBeenCalledWith('SELECT name, score, lives, jokers_used FROM players WHERE room_code = $1', ['XYZ789']);
+        expect(mockRes.status).not.toHaveBeenCalledWith(404);
+        expect(mockRes.json).toHaveBeenCalledWith({ ...mockGame, players: mockPlayers });
+    });
+
+    it('should fall back to game_id lookup when room_code misses (numeric IDs)', async () => {
+        mockReq.params = { id: '5' };
+        const mockGame = { game_id: 5, name: 'Fallback Game', player_count: 4, room_code: 'ABC123', current_level: 1 };
+        const mockPlayers = [{ name: 'PlayerB', score: 0, lives: 3 }];
+
+        mockDb.query
+            .mockResolvedValueOnce({ rows: [] }) // room_code miss
+            .mockResolvedValueOnce({ rows: [mockGame] }) // game_id hit
+            .mockResolvedValueOnce({ rows: mockPlayers });
+
+        await gameController.getGameById(mockReq as Request, mockRes as Response);
+
+        expect(mockDb.query).toHaveBeenCalledWith('SELECT * FROM games WHERE room_code = $1', ['5']);
+        expect(mockDb.query).toHaveBeenCalledWith('SELECT * FROM games WHERE game_id = $1', ['5']);
         expect(mockRes.status).not.toHaveBeenCalledWith(404);
         expect(mockRes.json).toHaveBeenCalledWith({ ...mockGame, players: mockPlayers });
     });

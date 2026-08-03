@@ -18,6 +18,8 @@
     "kick": "Kicken",
     "end_game": "Spiel beenden",
     "pause_game": "Spiel pausieren",
+    "resume_game": "Spiel fortsetzen",
+    "game_paused": "Spiel vom Host pausiert — bitte warten...",
     "welcome_message": "Willkommen bei Wer wird Millionär!",
     "choose_option": "Wähle eine Option:",
     "create_game": "Neues Spiel erstellen",

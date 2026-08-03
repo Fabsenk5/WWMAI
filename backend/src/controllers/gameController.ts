@@ -21,11 +21,28 @@ export function getPrizeForLevel(level: number): number {
     return PRIZE_AMOUNTS[level - 1] || 0;
 }
 
+interface PendingTimer {
+    kind: 'round' | 'advance';
+    remainingMs: number;
+    startedAt: number;
+    timer?: NodeJS.Timeout;
+    gameId: number;
+    currentLevel: number;
+    waitTimeInfo: number;
+    correctAnswer?: string;
+    playerCount?: number;
+    lives?: number;
+}
+
 export class GameController {
     private questionModel: QuestionModel;
     private db: Pool;
     private io: SocketIOServer; // Add io property
     private aiService: AiService;
+    // Per-room pending timers (question timeout + advance-to-next-question),
+    // pausable by the host. Keyed by roomCode.
+    private roomTimers: Map<string, PendingTimer> = new Map();
+    private static readonly QUESTION_TIMEOUT_MS = 45 * 1000;
 
     // Helper to update stats
     private async finalizeGameStats(roomCode: string, gameMode: string, result: 'win' | 'loss', finalLevel: number): Promise<void> {
@@ -87,6 +104,7 @@ export class GameController {
 
     // Helper method to advance to the next question
     private async advanceToNextQuestion(roomCode: string, gameId: number, currentLevel: number): Promise<void> {
+        this.clearRoomTimer(roomCode); // ensure no stale timers for this room
         try {
             console.log(`Advancing game in room ${roomCode} from level ${currentLevel} to ${currentLevel + 1}`);
 
@@ -114,7 +132,9 @@ export class GameController {
             // Fetch used question IDs to prevent duplicates
             const usedQuestionsQuery = `SELECT DISTINCT question_id FROM player_answers WHERE room_code = $1`;
             const usedQuestionsResult = await this.db.query(usedQuestionsQuery, [roomCode]);
-            const excludeIds = usedQuestionsResult.rows.map((row: any) => row.question_id);
+            const excludeIds = usedQuestionsResult.rows
+                .map((row: any) => row.question_id)
+                .filter((id: any) => id !== null && id !== undefined); // NULLs would break NOT IN
             console.log(`[advanceToNextQuestion] Excluding IDs: ${excludeIds.join(', ')}`);
 
             // Load embeddings of already-used questions so the next pick can be
@@ -322,17 +342,55 @@ export class GameController {
             const { roomCode } = req.params;
             const requesterId = req.user?.userId;
 
-            const gameRes = await this.db.query('SELECT host_id FROM games WHERE room_code = $1', [roomCode]);
-            if (gameRes.rows.length === 0 || gameRes.rows[0].host_id !== requesterId) {
+            const gameRes = await this.db.query('SELECT game_id, host_id, status FROM games WHERE room_code = $1', [roomCode]);
+            if (gameRes.rows.length === 0) {
+                res.status(404).json({ error: 'Game not found' });
+                return;
+            }
+            const game = gameRes.rows[0];
+            if (game.host_id === null || game.host_id === undefined || String(game.host_id) !== String(requesterId)) {
                 res.status(403).json({ error: 'Unauthorized' });
                 return;
             }
 
-            // Toggle pause - for now just emit event
-            this.io.to(roomCode).emit('gamePaused', { message: 'Game paused by host' });
-            res.status(200).json({ message: 'Game paused' });
+            if (game.status === 'paused') {
+                // RESUME
+                await this.db.query(
+                    `UPDATE games SET status = 'started', last_active = CURRENT_TIMESTAMP WHERE game_id = $1`,
+                    [game.game_id]
+                );
+                // Resume pending timer with the remaining time
+                const entry = this.roomTimers.get(roomCode);
+                if (entry && !entry.timer && entry.remainingMs > 0) {
+                    entry.startedAt = Date.now();
+                    entry.timer = setTimeout(() => this.fireRoomTimer(roomCode), entry.remainingMs);
+                }
+                this.io.to(roomCode).emit('gameResumed', { message: 'Game resumed by host' });
+                res.status(200).json({ message: 'Game resumed', paused: false });
+
+            } else if (game.status === 'started') {
+                // PAUSE
+                await this.db.query(
+                    `UPDATE games SET status = 'paused' WHERE game_id = $1`,
+                    [game.game_id]
+                );
+                // Pause pending timer, keep the remaining time
+                const entry = this.roomTimers.get(roomCode);
+                if (entry?.timer) {
+                    clearTimeout(entry.timer);
+                    entry.timer = undefined;
+                    entry.remainingMs = Math.max(0, entry.remainingMs - (Date.now() - entry.startedAt));
+                    console.log(`[Pause] Room ${roomCode} paused with ${(entry.remainingMs / 1000).toFixed(0)}s left on timer.`);
+                }
+                this.io.to(roomCode).emit('gamePaused', { message: 'Game paused by host' });
+                res.status(200).json({ message: 'Game paused', paused: true });
+
+            } else {
+                res.status(409).json({ error: 'Game is not running.' });
+            }
 
         } catch (error) {
+            console.error('Error pausing game:', error);
             res.status(500).json({ error: 'Server error' });
         }
     };
@@ -656,7 +714,7 @@ export class GameController {
         let firstQuestion: any = null; // Declare firstQuestion here to make it accessible in the broader scope
         let hostId: any = null; // Declare hostId here to make it accessible after the transaction
         const { roomCode } = req.params;
-        const requestingUserId = req.body?.userId || (req as any).user?.userId;
+        const requestingUserId = (req as any).user?.userId ?? req.body?.userId;
         console.log('startGame method invoked with roomCode:', roomCode);
 
         if (!roomCode) {
@@ -680,6 +738,15 @@ export class GameController {
 
             const game = gameCheckResult.rows[0];
             hostId = game.host_id;
+
+            // Only the host may start the game (guest-hosted rooms stay open)
+            if (hostId !== null && hostId !== undefined
+                && (requestingUserId === undefined || String(hostId) !== String(requestingUserId))) {
+                await client.query('ROLLBACK');
+                res.status(403).json({ error: 'Only the host can start the game.' });
+                return;
+            }
+
             if (game.status !== 'pending') {
                 await client.query('ROLLBACK');
                 res.status(409).json({
@@ -803,6 +870,251 @@ export class GameController {
 
     }
 
+    // ================= Timer management (pausable by host) =================
+
+    private clearRoomTimer(roomCode: string): void {
+        const entry = this.roomTimers.get(roomCode);
+        if (entry?.timer) {
+            clearTimeout(entry.timer);
+        }
+        this.roomTimers.delete(roomCode);
+    }
+
+    private startRoundTimer(roomCode: string, gameId: number, currentLevel: number, waitTimeInfo: number, correctAnswer: string, playerCount: number, lives: number): void {
+        if (this.roomTimers.has(roomCode)) return; // one pending timer per room
+        const entry: PendingTimer = {
+            kind: 'round',
+            remainingMs: GameController.QUESTION_TIMEOUT_MS,
+            startedAt: Date.now(),
+            gameId,
+            currentLevel,
+            waitTimeInfo,
+            correctAnswer,
+            playerCount,
+            lives,
+        };
+        entry.timer = setTimeout(() => this.fireRoomTimer(roomCode), entry.remainingMs);
+        this.roomTimers.set(roomCode, entry);
+        console.log(`[RoundTimer] Started ${GameController.QUESTION_TIMEOUT_MS / 1000}s round timer for room ${roomCode} (level ${currentLevel}).`);
+    }
+
+    private startAdvanceTimer(roomCode: string, gameId: number, currentLevel: number, waitTimeInfo: number): void {
+        this.clearRoomTimer(roomCode);
+        const entry: PendingTimer = {
+            kind: 'advance',
+            remainingMs: waitTimeInfo * 1000,
+            startedAt: Date.now(),
+            gameId,
+            currentLevel,
+            waitTimeInfo,
+        };
+        entry.timer = setTimeout(() => this.fireRoomTimer(roomCode), entry.remainingMs);
+        this.roomTimers.set(roomCode, entry);
+        console.log(`[AdvanceTimer] Next question for room ${roomCode} in ${waitTimeInfo}s.`);
+    }
+
+    private fireRoomTimer(roomCode: string): void {
+        const entry = this.roomTimers.get(roomCode);
+        if (!entry) return;
+        this.roomTimers.delete(roomCode);
+
+        if (entry.kind === 'round') {
+            this.forceResolveRound(roomCode, entry).catch(err => {
+                console.error(`[RoundTimer] Force-resolve failed for room ${roomCode}:`, err);
+            });
+        } else {
+            this.advanceToNextQuestion(roomCode, entry.gameId, entry.currentLevel).catch(err => {
+                console.error(`[AdvanceTimer] Advance failed for room ${roomCode}:`, err);
+            });
+        }
+    }
+
+    private async forceResolveRound(roomCode: string, entry: PendingTimer): Promise<void> {
+        console.log(`[RoundTimer] Timeout reached for room ${roomCode} — force resolving round.`);
+        // Verify the round is still the current one
+        const gameRes = await this.db.query(
+            `SELECT current_question_id, status, game_mode FROM games WHERE room_code = $1`,
+            [roomCode]
+        );
+        const game = gameRes.rows[0];
+        if (!game || game.status !== 'started') return;
+
+        if (game.game_mode === 'survival') {
+            // Living players who did not answer lose a life (recorded as failed answer)
+            const livingRes = await this.db.query(
+                `SELECT userId FROM players WHERE room_code = $1 AND lives > 0`,
+                [roomCode]
+            );
+            const answeredRes = await this.db.query(
+                `SELECT DISTINCT user_id FROM player_answers WHERE question_id = $1 AND room_code = $2 AND level = $3`,
+                [game.current_question_id, roomCode, entry.currentLevel]
+            );
+            const answeredSet = new Set(answeredRes.rows.map((r: any) => r.user_id));
+            for (const p of livingRes.rows) {
+                if (answeredSet.has(p.userid)) continue;
+                console.log(`[RoundTimer] ${p.userid} did not answer — losing a life.`);
+                await this.db.query(
+                    `UPDATE players SET lives = GREATEST(lives - 1, 0) WHERE userId = $1 AND room_code = $2`,
+                    [p.userid, roomCode]
+                );
+                await this.db.query(
+                    `INSERT INTO player_answers (user_id, question_id, answer, is_correct, room_code, level, category)
+                     VALUES ($1, $2, NULL, $3, $4, $5, NULL)`,
+                    [p.userid, game.current_question_id, false, roomCode, entry.currentLevel]
+                );
+            }
+            await this.resolveSurvivalRound(roomCode, entry.gameId, entry.currentLevel, entry.waitTimeInfo, entry.correctAnswer!);
+        } else {
+            await this.resolveCoopRound(roomCode, entry.gameId, entry.currentLevel, entry.waitTimeInfo, entry.correctAnswer!, entry.playerCount!, entry.lives!);
+        }
+    }
+
+    private async resolveSurvivalRound(roomCode: string, gameId: number, currentLevel: number, waitTimeInfo: number, correctAnswer: string): Promise<void> {
+        const gameRes = await this.db.query(
+            `SELECT current_question_id FROM games WHERE room_code = $1`,
+            [roomCode]
+        );
+        const questionId = gameRes.rows[0]?.current_question_id;
+        if (!questionId) return;
+
+        const allAnswersQuery = `
+            SELECT p.name, p.userId, pa.answer, pa.is_correct, p.lives, p.score
+            FROM player_answers pa
+            JOIN players p ON pa.user_id = p.userId AND pa.room_code = p.room_code
+            WHERE pa.question_id = $1 AND pa.room_code = $2 AND pa.level = $3
+        `;
+        const allAnswersResult = await this.db.query(allAnswersQuery, [questionId, roomCode, currentLevel]);
+
+        const survivorsResult = await this.db.query(`SELECT userId FROM players WHERE room_code = $1 AND lives > 0`, [roomCode]);
+        const survivors = survivorsResult.rows.map((r: any) => r.userId);
+        const survivorCount = survivors.length;
+
+        let gameEnded = false;
+        let message = 'Round finished.';
+
+        if (survivorCount === 0) {
+            gameEnded = true;
+            message = 'Game Over! No survivors.';
+            await this.db.query(`UPDATE games SET status = 'ended' WHERE game_id = $1`, [gameId]);
+            await this.finalizeGameStats(roomCode, 'survival', 'loss', currentLevel);
+        } else if (currentLevel >= 15) {
+            gameEnded = true;
+            message = 'Game Over! Victory!';
+            await this.db.query(`UPDATE games SET status = 'ended' WHERE game_id = $1`, [gameId]);
+            await this.finalizeGameStats(roomCode, 'survival', 'win', currentLevel);
+        }
+
+        this.io.to(roomCode).emit('revealAnswers', {
+            correctAnswer: correctAnswer,
+            playerAnswers: allAnswersResult.rows,
+            timeToNextQuestion: gameEnded ? waitTimeInfo + 30 : waitTimeInfo,
+            currentLevel: currentLevel,
+            gameEnded,
+            gameMode: 'survival'
+        });
+
+        if (!gameEnded) {
+            this.startAdvanceTimer(roomCode, gameId, currentLevel, waitTimeInfo);
+        } else {
+            const finalMessage = message === 'Game Over! Victory!' ? 'You won - Victory!' : message;
+            setTimeout(() => {
+                this.io.to(roomCode).emit('gameEnded', {
+                    message: finalMessage,
+                    winnerIds: survivors,
+                    gameMode: 'survival'
+                });
+            }, (waitTimeInfo + 30) * 1000);
+        }
+    }
+
+    private async resolveCoopRound(roomCode: string, gameId: number, currentLevel: number, waitTimeInfo: number, correctAnswer: string, playerCount: number, lives: number): Promise<void> {
+        const gameRes = await this.db.query(
+            `SELECT current_question_id, lives AS game_lives FROM games WHERE room_code = $1`,
+            [roomCode]
+        );
+        const game = gameRes.rows[0];
+        if (!game) return;
+        const questionId = game.current_question_id;
+        const currentLives = lives ?? game.game_lives ?? 3;
+
+        // Determine Team Answer (Majority Vote; random tie-break on equal votes)
+        const voteQuery = `
+            SELECT answer, COUNT(*) as vote_count 
+            FROM player_answers 
+            WHERE question_id = $1 AND room_code = $2 AND level = $3 
+            GROUP BY answer 
+            ORDER BY vote_count DESC, RANDOM() 
+            LIMIT 1
+        `;
+        const voteResult = await this.db.query(voteQuery, [questionId, roomCode, currentLevel]);
+        const teamAnswer = voteResult.rows[0]?.answer ?? null;
+        const isTeamCorrect = teamAnswer === correctAnswer;
+
+        let gameEnded = false;
+        let newLives = currentLives;
+
+        const currentPrize = getPrizeForLevel(currentLevel);
+
+        if (isTeamCorrect) {
+            const updateScoreQuery = `UPDATE players SET score = $1 WHERE room_code = $2`;
+            await this.db.query(updateScoreQuery, [currentPrize, roomCode]);
+
+            if (currentLevel >= 15) {
+                gameEnded = true;
+                await this.db.query(`UPDATE games SET status = 'ended', last_active = CURRENT_TIMESTAMP WHERE game_id = $1`, [gameId]);
+                await this.finalizeGameStats(roomCode, 'cooperative', 'win', currentLevel);
+            }
+        } else {
+            newLives = currentLives - 1;
+            await this.db.query(`UPDATE games SET lives = $1, last_active = CURRENT_TIMESTAMP WHERE game_id = $2`, [newLives, gameId]);
+
+            if (newLives <= 0) {
+                gameEnded = true;
+                await this.db.query(`UPDATE games SET status = 'ended' WHERE game_id = $1`, [gameId]);
+                await this.finalizeGameStats(roomCode, 'cooperative', 'loss', currentLevel);
+            }
+        }
+
+        // Get all player answers for reveal
+        const allAnswersQuery = `
+            SELECT p.name, pa.answer, pa.is_correct 
+            FROM player_answers pa
+            JOIN players p ON pa.user_id = p.userId AND pa.room_code = p.room_code
+            WHERE pa.question_id = $1 AND pa.room_code = $2 AND pa.level = $3
+        `;
+        const allAnswersResult = await this.db.query(allAnswersQuery, [questionId, roomCode, currentLevel]);
+
+        // Mark room members who did not answer
+        const answeredNames = new Set(allAnswersResult.rows.map((r: any) => r.name));
+        const membersRes = await this.db.query(`SELECT name FROM players WHERE room_code = $1`, [roomCode]);
+        const noAnswerRows = membersRes.rows
+            .filter((m: any) => !answeredNames.has(m.name))
+            .map((m: any) => ({ name: m.name, answer: 'No answer', is_correct: false }));
+        const playerAnswers = [...allAnswersResult.rows, ...noAnswerRows];
+
+        const revealPayload = {
+            correctAnswer: correctAnswer,
+            teamAnswer: teamAnswer,
+            isTeamCorrect: isTeamCorrect,
+            livesRemaining: newLives,
+            playerAnswers: playerAnswers,
+            timeToNextQuestion: gameEnded ? waitTimeInfo + 30 : waitTimeInfo,
+            currentLevel: currentLevel,
+            gameEnded: gameEnded,
+            gameMode: 'cooperative'
+        };
+
+        this.io.to(roomCode).emit('revealAnswers', revealPayload);
+
+        if (!gameEnded) {
+            this.startAdvanceTimer(roomCode, gameId, currentLevel, waitTimeInfo);
+        } else {
+            setTimeout(() => {
+                this.io.to(roomCode).emit('gameEnded', { message: isTeamCorrect ? 'You won - Victory!' : 'Game Over (Lives Depleted)' });
+            }, (waitTimeInfo + 30) * 1000);
+        }
+    }
+
     public async submitAnswer(req: Request, res: Response): Promise<void> {
         try {
             const { roomCode } = req.params;
@@ -830,10 +1142,20 @@ export class GameController {
                 return;
             }
 
+            // Membership check: only players of this room may submit answers
+            const memberRes = await this.db.query(
+                `SELECT 1 FROM players WHERE userId = $1 AND room_code = $2`,
+                [userId, roomCode]
+            );
+            if (memberRes.rows.length === 0) {
+                res.status(403).json({ error: 'You are not a member of this room.' });
+                return;
+            }
+
             // Security Check: Is the player allowed to answer?
             if (game_mode === 'survival') {
-                const playerQuery = `SELECT lives FROM players WHERE userId = $1`;
-                const playerResult = await this.db.query(playerQuery, [userId]);
+                const playerQuery = `SELECT lives FROM players WHERE userId = $1 AND room_code = $2`;
+                const playerResult = await this.db.query(playerQuery, [userId, roomCode]);
                 if (playerResult.rows.length === 0 || playerResult.rows[0].lives <= 0) {
                     res.status(403).json({ error: 'You have been eliminated and cannot vote.' });
                     return;
@@ -894,64 +1216,13 @@ export class GameController {
                 // If everyone alive has answered (or everyone is dead and we are resolving the final answers)
                 if (answersCount >= livingPlayerCount) {
                     // RESOLVE ROUND
-                    const allAnswersQuery = `
-                        SELECT p.name, p.userId, pa.answer, pa.is_correct, p.lives, p.score
-                        FROM player_answers pa
-                        JOIN players p ON pa.user_id = p.userId AND pa.room_code = p.room_code
-                        WHERE pa.question_id = $1 AND pa.room_code = $2 AND pa.level = $3
-                    `;
-                    const allAnswersResult = await this.db.query(allAnswersQuery, [current_question_id, roomCode, current_level]);
-
-                    // Check if *anyone* is still alive to continue
-                    const survivorsResult = await this.db.query(`SELECT userId FROM players WHERE room_code = $1 AND lives > 0`, [roomCode]);
-                    const survivors = survivorsResult.rows.map(r => r.userId);
-                    const survivorCount = survivors.length;
-
-                    let gameEnded = false;
-                    let message = 'Round finished.';
-
-                    if (survivorCount === 0) {
-                        gameEnded = true;
-                        message = 'Game Over! No survivors.';
-                        await this.db.query(`UPDATE games SET status = 'ended' WHERE game_id = $1`, [gameId]);
-                        await this.finalizeGameStats(roomCode, 'survival', 'loss', current_level);
-                    } else if (current_level >= 15) {
-                        gameEnded = true;
-                        message = 'Game Over! Victory!';
-                        await this.db.query(`UPDATE games SET status = 'ended' WHERE game_id = $1`, [gameId]);
-                        await this.finalizeGameStats(roomCode, 'survival', 'win', current_level);
-                    }
-
-                    this.io.to(roomCode).emit('revealAnswers', {
-                        correctAnswer: correct_answer,
-                        playerAnswers: allAnswersResult.rows,
-                        timeToNextQuestion: gameEnded ? waitTimeInfo + 30 : waitTimeInfo,
-                        currentLevel: current_level,
-                        gameEnded,
-                        gameMode: 'survival'
-                    });
-
-                    if (!gameEnded) {
-                        setTimeout(() => {
-                            this.advanceToNextQuestion(roomCode, gameId, current_level);
-                        }, waitTimeInfo * 1000);
-                    } else {
-                        // Delay Game Over for 30s + waitTime to let users see results
-                        const finalMessage = message === 'Game Over! Victory!' ? 'You won - Victory!' : message;
-                        setTimeout(() => {
-                            // Include winnerIds in the payload so frontend can show tailored screens
-                            this.io.to(roomCode).emit('gameEnded', {
-                                message: finalMessage,
-                                winnerIds: survivors,
-                                gameMode: 'survival'
-                            });
-                        }, (waitTimeInfo + 30) * 1000);
-                    }
-
+                    this.clearRoomTimer(roomCode);
+                    await this.resolveSurvivalRound(roomCode, gameId, current_level, waitTimeInfo, correct_answer);
                     res.status(200).json({ message: 'All answers received.', waiting: false });
 
                 } else {
-                    // Waiting for others
+                    // Waiting for others — arm a round timeout so the round cannot hang
+                    this.startRoundTimer(roomCode, gameId, current_level, waitTimeInfo, correct_answer, player_count, lives);
                     this.io.to(roomCode).emit('playerAnswered', { count: answersCount, total: livingPlayerCount });
                     res.status(200).json({ message: 'Answer recorded. Waiting for other players.', waiting: true });
                 }
@@ -974,90 +1245,18 @@ export class GameController {
             const answersCount = parseInt(countResult.rows[0].count, 10);
 
             if (answersCount < player_count) {
-                // Not everyone answered yet
+                // Not everyone answered yet — arm a round timeout so the round cannot hang
+                this.startRoundTimer(roomCode, gameId, current_level, waitTimeInfo, correct_answer, player_count, lives);
                 this.io.to(roomCode).emit('playerAnswered', { count: answersCount, total: player_count });
                 res.status(200).json({ message: 'Answer recorded. Waiting for teammates.', waiting: true });
                 return;
             }
 
             // --- ALL PLAYERS ANSWERED: RESOLVE ROUND ---
+            this.clearRoomTimer(roomCode);
+            await this.resolveCoopRound(roomCode, gameId, current_level, waitTimeInfo, correct_answer, player_count, lives);
 
-            // Determine Team Answer (Majority Vote)
-            const voteQuery = `
-                SELECT answer, COUNT(*) as vote_count 
-                FROM player_answers 
-                WHERE question_id = $1 AND room_code = $2 AND level = $3 
-                GROUP BY answer 
-                ORDER BY vote_count DESC, answer ASC 
-                LIMIT 1
-            `;
-            const voteResult = await this.db.query(voteQuery, [current_question_id, roomCode, current_level]);
-            const teamAnswer = voteResult.rows[0].answer;
-            const isTeamCorrect = teamAnswer === correct_answer;
-
-            let nextQuestionData = null;
-            let gameEnded = false;
-            let newLives = lives;
-
-            const currentPrize = getPrizeForLevel(current_level);
-
-            if (isTeamCorrect) {
-                // Update scores for ALL players
-                const updateScoreQuery = `UPDATE players SET score = $1 WHERE room_code = $2`;
-                await this.db.query(updateScoreQuery, [currentPrize, roomCode]);
-
-                if (current_level >= 15) {
-                    gameEnded = true;
-                    await this.db.query(`UPDATE games SET status = 'ended', last_active = CURRENT_TIMESTAMP WHERE game_id = $1`, [gameId]);
-                    await this.finalizeGameStats(roomCode, 'cooperative', 'win', current_level);
-                }
-            } else {
-                // Team is WRONG
-                newLives = lives - 1;
-                await this.db.query(`UPDATE games SET lives = $1, last_active = CURRENT_TIMESTAMP WHERE game_id = $2`, [newLives, gameId]);
-
-                if (newLives <= 0) {
-                    gameEnded = true;
-                    await this.db.query(`UPDATE games SET status = 'ended' WHERE game_id = $1`, [gameId]);
-                    await this.finalizeGameStats(roomCode, 'cooperative', 'loss', current_level);
-                }
-            }
-
-            // Get all player answers for reveal
-            const allAnswersQuery = `
-                SELECT p.name, pa.answer, pa.is_correct 
-                FROM player_answers pa
-                JOIN players p ON pa.user_id = p.userId AND pa.room_code = p.room_code
-                WHERE pa.question_id = $1 AND pa.room_code = $2 AND pa.level = $3
-            `;
-            const allAnswersResult = await this.db.query(allAnswersQuery, [current_question_id, roomCode, current_level]);
-
-            const revealPayload = {
-                correctAnswer: correct_answer,
-                teamAnswer: teamAnswer,
-                isTeamCorrect: isTeamCorrect,
-                livesRemaining: newLives,
-                playerAnswers: allAnswersResult.rows,
-                timeToNextQuestion: gameEnded ? waitTimeInfo + 30 : waitTimeInfo,
-                currentLevel: current_level,
-                gameEnded: gameEnded,
-                gameMode: 'cooperative'
-            };
-
-            this.io.to(roomCode).emit('revealAnswers', revealPayload);
-
-            if (!gameEnded) {
-                setTimeout(() => {
-                    this.advanceToNextQuestion(roomCode, gameId, current_level);
-                }, waitTimeInfo * 1000); // Configurable wait time
-            } else {
-                // DELAY Game Over so players can see the reveal (correct answer)
-                setTimeout(() => {
-                    this.io.to(roomCode).emit('gameEnded', { message: isTeamCorrect ? 'You won - Victory!' : 'Game Over (Lives Depleted)' });
-                }, (waitTimeInfo + 30) * 1000);
-            }
-
-            res.status(200).json({ message: 'Round resolved', waiting: false, teamAnswer, isTeamCorrect });
+            res.status(200).json({ message: 'Round resolved', waiting: false });
 
         } catch (error) {
             console.error('Error handling answer:', error);
@@ -1278,12 +1477,12 @@ export class GameController {
             const isNumericId = !isNaN(Number(id));
             console.log(`[getGameById] ID '${id}' is ${isNumericId ? 'numeric (game_id)' : 'alphanumeric (room_code)'}`); // Log ID type
 
-            // Fetch game details using the appropriate column
-            const gameQuery = isNumericId
-                ? `SELECT * FROM games WHERE game_id = $1`
-                : `SELECT * FROM games WHERE room_code = $1`;
-
-            const gameResult = await this.db.query(gameQuery, [id]);
+            // Fetch game details — try room_code FIRST (room codes may be purely
+            // numeric, e.g. "123456", which would otherwise be mistaken for a game_id)
+            let gameResult = await this.db.query(`SELECT * FROM games WHERE room_code = $1`, [id]);
+            if (gameResult.rows.length === 0 && isNumericId) {
+                gameResult = await this.db.query(`SELECT * FROM games WHERE game_id = $1`, [id]);
+            }
             console.log(`[getGameById] Game query result count: ${gameResult.rows.length}`); // Log query result
 
             if (gameResult.rows.length === 0) {
@@ -1372,9 +1571,12 @@ export class GameController {
 
             const { current_question_id, current_level, status, selected_categories, host_id } = gameResult.rows[0];
 
-            // Only the host may see the correct answer (anti-cheat)
-            const requestingUserId = (req as any).user?.userId ?? userId;
-            const isHost = host_id !== null && host_id !== undefined && String(host_id) === String(requestingUserId);
+            // Only the host may see the correct answer (anti-cheat).
+            // Host identity is derived from the JWT ONLY — the userId query param
+            // is client-controlled and must not grant host privileges.
+            const authedUserId = (req as any).user?.userId;
+            const isHost = authedUserId !== undefined && host_id !== null && host_id !== undefined
+                && String(host_id) === String(authedUserId);
 
             // Handle non-active game states
             if (status === 'pending') {

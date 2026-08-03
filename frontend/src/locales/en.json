@@ -18,6 +18,8 @@
     "kick": "Kick",
     "end_game": "End Game",
     "pause_game": "Pause Game",
+    "resume_game": "Resume Game",
+    "game_paused": "Game paused by host — please wait...",
     "welcome_message": "Welcome to Who Wants to be a Millionaire!",
     "choose_option": "Choose an option to begin:",
     "create_game": "Create New Game",

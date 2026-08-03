@@ -40,7 +40,7 @@ const GamePage: React.FC = () => {
 
   // Determine if the current user is the host AND moderator mode is enabled
   const userId = localStorage.getItem('userId');
-  const isHostUser = gameData?.host_id === userId;
+  const isHostUser = gameData?.host_id !== undefined && String(gameData?.host_id) === String(userId);
   const isModeratorMode = gameData?.moderator_mode === true; // Default to false if undefined
   const showHostView = isHostUser && isModeratorMode;
 
@@ -128,14 +128,25 @@ const GamePage: React.FC = () => {
         }
       });
 
-      socket.on('revealAnswers', (data) => {
+      socket.on('revealAnswers', (data: any) => {
         // Audio: Win/Lose
         stopAll();
         // Use ref for current data
         const currentData = gameDataRef.current;
         const level = currentData?.current_level || 1;
 
-        if (data.isTeamCorrect) {
+        if (data.gameMode === 'survival') {
+          // Survival has no team result — use the viewer's own result (if any)
+          const myUserId = user ? String(user.id) : localStorage.getItem('userId');
+          const myResult = (data.playerAnswers || []).find((p: any) => p.userId === myUserId);
+          if (!myResult) {
+            // host/spectator without own answer: no personal win/lose sfx
+          } else if (myResult.is_correct) {
+            playSFX(getAudioForLevel(level, 'win'));
+          } else {
+            playSFX(getAudioForLevel(level, 'lose'));
+          }
+        } else if (data.isTeamCorrect) {
           playSFX(getAudioForLevel(level, 'win'));
         } else {
           playSFX(getAudioForLevel(level, 'lose'));
@@ -180,6 +191,14 @@ const GamePage: React.FC = () => {
             if (setGameData) setGameData(prev => prev ? ({ ...prev, users: players }) : prev);
           })
           .catch(console.error);
+      });
+
+      socket.on('gamePaused', () => {
+        setGameData(prev => prev ? { ...prev, status: 'paused' } : prev);
+      });
+
+      socket.on('gameResumed', () => {
+        setGameData(prev => prev ? { ...prev, status: 'started' } : prev);
       });
 
       // Cleanup on unmount or roomCode change
@@ -254,7 +273,7 @@ const GamePage: React.FC = () => {
             'Content-Type': 'application/json',
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
-          body: JSON.stringify({ userId }),
+          body: JSON.stringify({ userId: user ? String(user.id) : userId }),
         });
         if (response.ok) {
           const data = await response.json();
@@ -265,6 +284,26 @@ const GamePage: React.FC = () => {
         console.error('Error starting game:', err);
         showAlert('Error starting game', 'Error');
       }
+    }
+  };
+
+  const handlePauseToggle = async () => {
+    if (!roomCode) return;
+    try {
+      const token = localStorage.getItem('token');
+      const res = await fetch(`${API_BASE_URL}/api/games/${roomCode}/pause`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        showAlert(data.error || 'Failed to toggle pause', 'Error');
+      }
+    } catch (err) {
+      console.error('Failed to toggle pause:', err);
     }
   };
 
@@ -343,14 +382,23 @@ const GamePage: React.FC = () => {
       ) : gameData?.status !== 'started' ? (
         <button onClick={startGame} className="button">{t('start_game')}</button>
       ) : (
-        <QuestionDisplay
-          question={currentQuestion}
-          onSubmit={handleAnswerSubmit}
-          showCorrectAnswer={true}
-          errorMessage={questionError}
-          onRefresh={refreshQuestion}
-          isHost={showHostView}
-        />
+        <div>
+          <QuestionDisplay
+            question={currentQuestion}
+            onSubmit={handleAnswerSubmit}
+            showCorrectAnswer={true}
+            errorMessage={questionError}
+            onRefresh={refreshQuestion}
+            isHost={showHostView}
+          />
+          {showHostView && (
+            <div className="text-center" style={{ marginTop: '15px' }}>
+              <button onClick={handlePauseToggle} className="btn btn-secondary">
+                {(gameData?.status as string) === 'paused' ? t('resume_game') : t('pause_game')}
+              </button>
+            </div>
+          )}
+        </div>
       )}
 
       <Scoreboard players={gameData?.users || []} gameEnded={gameEnded} />

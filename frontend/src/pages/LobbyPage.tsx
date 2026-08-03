@@ -299,6 +299,14 @@ const LobbyPage: React.FC = () => {
       }
     };
 
+    const handleGamePaused = () => {
+      setGameDataFromContext(prev => prev ? { ...prev, status: 'paused' } : null);
+    };
+
+    const handleGameResumed = () => {
+      setGameDataFromContext(prev => prev ? { ...prev, status: 'started' } : null);
+    };
+
     const handleGameEnded = (data: { message: string }) => {
       // Backend still emits this after 30s. We can use it to force redirect.
       stopAll();
@@ -341,6 +349,8 @@ const LobbyPage: React.FC = () => {
     socket.on('gameEnded', handleGameEnded);
     socket.on('userJoined', handleUserJoined);
     socket.on('jokerUsed', handleJokerUsed);
+    socket.on('gamePaused', handleGamePaused);
+    socket.on('gameResumed', handleGameResumed);
 
     socket.on('playerKicked', (data: { userId: string, name: string }) => {
       // If I am the one kicked
@@ -367,6 +377,8 @@ const LobbyPage: React.FC = () => {
       socket.off('gameEnded', handleGameEnded);
       socket.off('userJoined', handleUserJoined);
       socket.off('jokerUsed', handleJokerUsed);
+      socket.off('gamePaused', handleGamePaused);
+      socket.off('gameResumed', handleGameResumed);
       if (socket.connected) socket.disconnect();
       socketRef.current = null;
       if (countdownIntervalRef.current) {
@@ -488,8 +500,12 @@ const LobbyPage: React.FC = () => {
       </header>
 
       <div className="lobby-room-info">
-        <strong>{t('room')}:</strong> <span className="lobby-room-code">{roomCode}</span> | <strong>{t('level')}:</strong> {gameData?.current_level ?? 0}
+        <strong>{t('room')}:</strong> {roomCode} | <strong>{t('level')}:</strong> {gameData?.current_level ?? 0}
       </div>
+
+      {gameData?.status === 'paused' && (
+        <div className="waiting-message">{t('game_paused')}</div>
+      )}
 
       {waitingForCount && !revealedAnswers && (
         <div className="waiting-message">
@@ -651,7 +667,7 @@ const LobbyPage: React.FC = () => {
             const myUsedJokers = isSurvival ? (me?.jokers_used || []) : (gameData?.jokers_used || []);
             const isAlive = isSurvival ? (me ? me.lives > 0 : true) : ((gameData?.lives ?? 0) > 0);
 
-            if (!isAlive || answerSubmitted) return null;
+            if (!isAlive || answerSubmitted || gameData?.status === 'paused') return null;
 
             const jokers = [
               { type: '5050', label: '50:50', Icon: Split },
@@ -728,7 +744,7 @@ const LobbyPage: React.FC = () => {
                       <button
                         key={index}
                         onClick={() => setSelectedAnswer(optionText)}
-                        disabled={!isAlive || answerSubmitted}
+                        disabled={!isAlive || answerSubmitted || gameData?.status === 'paused'}
                         className={`option-button ${selectedAnswer === optionText ? 'selected' : ''}`}
                       >
                         <span className="option-prefix">{prefix}</span> {optionDisplay}
@@ -739,7 +755,7 @@ const LobbyPage: React.FC = () => {
                 {!answerSubmitted && (
                   <button
                     onClick={handleAnswerSubmit}
-                    disabled={!selectedAnswer || !isAlive}
+                    disabled={!selectedAnswer || !isAlive || gameData?.status === 'paused'}
                     className="submit-button"
                   >
                     {!isAlive ? t('btn_eliminated') : t('btn_submit')}

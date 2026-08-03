@@ -33,7 +33,7 @@ interface GameData { // Define a more specific type for gameData
     room_code: string;
     users: User[]; // Rename players to users
     questions?: Question[]; // Make questions optional, as they are loaded separately
-    status?: string; // Optional status field
+    status?: 'pending' | 'started' | 'paused' | 'ended'; // Optional status field
     current_level: number;
     lives: number; // Team lives
     game_mode?: 'cooperative' | 'survival'; // Add game_mode

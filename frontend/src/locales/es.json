@@ -18,6 +18,8 @@
     "kick": "Expulsar",
     "end_game": "Terminar juego",
     "pause_game": "Pausar juego",
+    "resume_game": "Reanudar juego",
+    "game_paused": "Juego pausado por el anfitrión — espera...",
     "welcome_message": "¡Bienvenido a ¿Quién quiere ser millonario?!",
     "choose_option": "Elige una opción para comenzar:",
     "create_game": "Crear nueva partida",
