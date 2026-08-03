@@ -41,7 +41,7 @@ const Scoreboard: React.FC<ScoreboardProps> = ({ players, gameEnded }) => {
                                     {player.name}
                                 </span>
                             </td>
-                            <td>{player.score}</td>
+                            <td>{player.score.toLocaleString('de-DE')}€</td>
                             <td>{player.lives}</td>
                         </tr>
                     ))}

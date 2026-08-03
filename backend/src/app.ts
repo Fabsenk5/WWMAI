@@ -190,6 +190,9 @@ socketIoInstance.on('connection', (socket: Socket) => {
             }
 
             await socket.join(roomCode);
+            // Remember room membership for disconnect broadcasting
+            socket.data.roomCode = roomCode;
+            socket.data.userId = userId;
             console.log(`Socket ${socket.id} (userId: ${userId}) successfully joined room: ${roomCode}`);
             socket.emit('joinedRoom', { roomCode, userId });
 
@@ -202,6 +205,12 @@ socketIoInstance.on('connection', (socket: Socket) => {
     });
 
     socket.on('disconnect', () => {
+        // Let the room know this player went offline (if they had joined a room)
+        const roomCode = socket.data.roomCode as string | undefined;
+        const userId = socket.data.userId as string | undefined;
+        if (roomCode && userId) {
+            socket.to(roomCode).emit('playerDisconnected', { userId });
+        }
         console.log('A user disconnected:', socket.id);
     });
 });

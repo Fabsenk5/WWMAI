@@ -337,6 +337,12 @@ export class GameController {
 
             const kickedName = deleteResult.rows[0].name;
 
+            // Keep user_count in sync
+            await this.db.query(
+                `UPDATE games SET user_count = (SELECT COUNT(*) FROM players WHERE room_code = $1) WHERE room_code = $1`,
+                [roomCode]
+            );
+
             // 3. Emit Socket Event
             this.io.to(roomCode).emit('playerKicked', { userId: userIdToKick, name: kickedName });
 
@@ -345,6 +351,41 @@ export class GameController {
 
         } catch (error) {
             console.error('Error kicking player:', error);
+            res.status(500).json({ error: 'Server error' });
+        }
+    };
+
+    public leaveGame = async (req: Request, res: Response): Promise<void> => {
+        try {
+            const { roomCode } = req.params;
+            const { userId } = req.body;
+
+            if (!roomCode || !userId) {
+                res.status(400).json({ error: 'Room code and user ID are required' });
+                return;
+            }
+
+            const deleteResult = await this.db.query(
+                `DELETE FROM players WHERE userId = $1 AND room_code = $2 RETURNING name`,
+                [userId, roomCode]
+            );
+
+            if (deleteResult.rowCount === 0) {
+                res.status(404).json({ error: 'Player not found in this room.' });
+                return;
+            }
+
+            // Keep user_count in sync
+            await this.db.query(
+                `UPDATE games SET user_count = (SELECT COUNT(*) FROM players WHERE room_code = $1) WHERE room_code = $1`,
+                [roomCode]
+            );
+
+            this.io.to(roomCode).emit('playerLeft', { userId, name: deleteResult.rows[0].name });
+            res.status(200).json({ message: 'Player left the game' });
+
+        } catch (error) {
+            console.error('Error leaving game:', error);
             res.status(500).json({ error: 'Server error' });
         }
     };
@@ -639,6 +680,12 @@ export class GameController {
             }
 
             console.log('Player successfully joined:', player);
+
+            // Keep user_count in sync (join path)
+            await this.db.query(
+                `UPDATE games SET user_count = (SELECT COUNT(*) FROM players WHERE room_code = $1) WHERE room_code = $1`,
+                [roomCode]
+            );
 
             // Auto-start Logic
             if (currentUserCount + 1 >= maxPlayers) {

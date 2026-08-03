@@ -60,6 +60,7 @@ export function setRoutes(app: Application) {
     router.post('/:roomCode/joker', checkRoomExists, gameController.useJoker.bind(gameController));
     // Protected Kick Route
     router.post('/:roomCode/kick', authenticateToken, checkRoomExists, gameController.kickPlayer.bind(gameController));
+    router.post('/:roomCode/leave', checkRoomExists, gameController.leaveGame.bind(gameController));
     router.post('/:roomCode/pause', authenticateToken, checkRoomExists, gameController.pauseGame.bind(gameController));
     router.post('/:roomCode/end', authenticateToken, checkRoomExists, gameController.endGame.bind(gameController));
 

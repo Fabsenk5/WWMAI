@@ -15,6 +15,81 @@
     margin-bottom: 20px;
 }
 
+.lobby-header-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    justify-content: flex-end;
+}
+
+/* Invite link copy button */
+.copy-link-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 10px;
+    margin-left: 10px;
+    font-size: 0.8rem;
+    background: var(--bg-inset);
+    color: var(--text-secondary);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-full);
+    box-shadow: none;
+}
+
+.copy-link-btn:hover:not(:disabled) {
+    background: var(--bg-elevated);
+    color: var(--accent-color);
+    transform: none;
+    box-shadow: none;
+}
+
+/* Prize ladder */
+.prize-ladder {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 6px;
+    margin-bottom: 16px;
+}
+
+.prize-step {
+    padding: 4px 10px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    color: var(--text-muted);
+    background: var(--bg-inset);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-full);
+    transition: all var(--transition-fast);
+}
+
+.prize-step.reached {
+    color: var(--success-color);
+    border-color: rgba(61, 220, 132, 0.35);
+}
+
+.prize-step.current {
+    color: var(--text-inverse);
+    background: var(--grad-gold);
+    border-color: transparent;
+    box-shadow: var(--shadow-gold);
+    transform: scale(1.12);
+}
+
+/* Offline players */
+.teammate-card.offline {
+    opacity: 0.45;
+    filter: grayscale(0.7);
+}
+
+.offline-icon {
+    color: var(--text-muted);
+    vertical-align: middle;
+    margin-left: 4px;
+}
+
 .lobby-header h1 {
     font-family: var(--font-display);
     font-size: 1.9rem;

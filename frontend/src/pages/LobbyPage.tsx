@@ -8,7 +8,7 @@ import { useModal } from '../context/ModalContext';
 import { useAudio } from '../context/AudioContext';
 import io, { Socket } from 'socket.io-client';
 import axios from 'axios';
-import { Heart, Skull, Trophy, Split, Users, Phone, UserX, CheckCircle2, XCircle, EyeOff, Timer } from 'lucide-react';
+import { Heart, Skull, Trophy, Split, Users, Phone, UserX, CheckCircle2, XCircle, EyeOff, Timer, Link2, LogOut, WifiOff } from 'lucide-react';
 import './LobbyPage.css'; // Import the new CSS file
 import { API_BASE_URL } from '../config/api';
 
@@ -49,6 +49,8 @@ const getSafeStorage = (key: string) => {
   }
 };
 
+const PRIZE_LADDER = [50, 100, 200, 300, 500, 1000, 2000, 4000, 8000, 16000, 32000, 64000, 125000, 500000, 1000000];
+
 const LobbyPage: React.FC = () => {
   const { roomCode } = useParams();
   const navigate = useNavigate();
@@ -79,6 +81,10 @@ const LobbyPage: React.FC = () => {
   const [answerDeadline, setAnswerDeadline] = useState<number | null>(null);
   const [answerTimeLeft, setAnswerTimeLeft] = useState<number | null>(null);
   const [pausedRemaining, setPausedRemaining] = useState<number | null>(null);
+
+  // Players whose socket disconnected (shown as offline in the teammate grid)
+  const [offlineUsers, setOfflineUsers] = useState<Set<string>>(new Set());
+  const [copiedInvite, setCopiedInvite] = useState(false);
 
   // REMOVED early return here to avoid conditional hook execution error
 
@@ -360,11 +366,25 @@ const LobbyPage: React.FC = () => {
       navigate('/');
     };
 
-    const handleUserJoined = () => {
+    const handleUserJoined = (data: { userId: string }) => {
+      // Player is back online
+      if (data?.userId) {
+        setOfflineUsers(prev => {
+          const next = new Set(prev);
+          next.delete(data.userId);
+          return next;
+        });
+      }
       if (roomCode) {
         axios.get(`${API_BASE_URL}/api/games/${roomCode}/players`)
           .then(res => setPlayers(res.data))
           .catch(err => console.error('Failed to update players list:', err));
+      }
+    };
+
+    const handlePlayerDisconnected = (data: { userId: string }) => {
+      if (data?.userId) {
+        setOfflineUsers(prev => new Set(prev).add(data.userId));
       }
     };
 
@@ -388,9 +408,18 @@ const LobbyPage: React.FC = () => {
     socket.on('revealAnswers', handleRevealAnswers);
     socket.on('gameEnded', handleGameEnded);
     socket.on('userJoined', handleUserJoined);
+    socket.on('playerDisconnected', handlePlayerDisconnected);
     socket.on('jokerUsed', handleJokerUsed);
     socket.on('gamePaused', handleGamePaused);
     socket.on('gameResumed', handleGameResumed);
+
+    socket.on('playerLeft', () => {
+      if (roomCode) {
+        axios.get(`${API_BASE_URL}/api/games/${roomCode}/players`)
+          .then(res => setPlayers(res.data))
+          .catch(err => console.error('Failed to update players list:', err));
+      }
+    });
 
     socket.on('playerKicked', (data: { userId: string, name: string }) => {
       // If I am the one kicked
@@ -416,6 +445,7 @@ const LobbyPage: React.FC = () => {
       socket.off('revealAnswers', handleRevealAnswers);
       socket.off('gameEnded', handleGameEnded);
       socket.off('userJoined', handleUserJoined);
+      socket.off('playerDisconnected', handlePlayerDisconnected);
       socket.off('jokerUsed', handleJokerUsed);
       socket.off('gamePaused', handleGamePaused);
       socket.off('gameResumed', handleGameResumed);
@@ -502,6 +532,51 @@ const LobbyPage: React.FC = () => {
   // Need to merge logic. Let's redefine main function body properly.
 
 
+  const handleStartGame = async () => {
+    if (!roomCode) return;
+    try {
+      const token = getSafeStorage('token');
+      const res = await fetch(`${API_BASE_URL}/api/games/${roomCode}/start`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ userId: user ? String(user.id) : getSafeStorage('userId') }),
+      });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        showAlert(data.error || 'Failed to start game', 'Error');
+      }
+    } catch (err) {
+      console.error('Failed to start game:', err);
+      showAlert('Failed to start game', 'Error');
+    }
+  };
+
+  const handleCopyInvite = async () => {
+    if (!roomCode) return;
+    const url = `${window.location.origin}/join?roomCode=${roomCode}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedInvite(true);
+      setTimeout(() => setCopiedInvite(false), 2000);
+    } catch (err) {
+      console.error('Failed to copy invite link:', err);
+    }
+  };
+
+  const handleLeave = async () => {
+    if (!roomCode) return;
+    const userId = getSafeStorage('userId');
+    try {
+      await axios.post(`${API_BASE_URL}/api/games/${roomCode}/leave`, { userId });
+    } catch (err) {
+      console.error('Failed to leave game:', err);
+    }
+    navigate('/');
+  };
+
   const handleAnswerSubmit = async () => {
     if (!selectedAnswer || !currentQuestion || !roomCode) return;
     try {
@@ -536,15 +611,43 @@ const LobbyPage: React.FC = () => {
     <div className="lobby-page">
       <header className="lobby-header">
         <h1>{gameData?.game_mode === 'survival' ? t('game_mode_survival') : t('game_mode_coop')}</h1>
-        {gameData?.game_mode !== 'survival' && (
-          <div className={`lobby-lives ${(gameData?.lives || 0) > 1 ? 'text-success' : 'text-danger'} ${(gameData?.lives ?? 3) <= 1 ? 'lives-low' : ''}`}>
-            <Heart size={18} fill="currentColor" /> {t('team_lives')}: {gameData?.lives ?? 3}
-          </div>
-        )}
+        <div className="lobby-header-actions">
+          {gameData?.game_mode !== 'survival' && (
+            <div className={`lobby-lives ${(gameData?.lives || 0) > 1 ? 'text-success' : 'text-danger'} ${(gameData?.lives ?? 3) <= 1 ? 'lives-low' : ''}`}>
+              <Heart size={18} fill="currentColor" /> {t('team_lives')}: {gameData?.lives ?? 3}
+            </div>
+          )}
+          {gameData?.status === 'pending'
+            && gameData?.host_id !== undefined && gameData?.host_id !== null
+            && String(gameData?.host_id) === String(user?.id) && (
+            <button className="btn btn-primary btn-sm" onClick={handleStartGame}>
+              {t('start_game')}
+            </button>
+          )}
+          <button className="btn btn-secondary btn-sm" onClick={handleLeave} title="Leave game">
+            <LogOut size={14} />
+          </button>
+        </div>
       </header>
 
       <div className="lobby-room-info">
         <strong>{t('room')}:</strong> {roomCode} | <strong>{t('level')}:</strong> {gameData?.current_level ?? 0}
+        <button className="copy-link-btn" onClick={handleCopyInvite} title={copiedInvite ? 'Link copied!' : 'Copy invite link'}>
+          <Link2 size={14} /> {copiedInvite ? '✓' : ''}
+        </button>
+      </div>
+
+      <div className="prize-ladder" aria-label="Prize ladder">
+        {PRIZE_LADDER.map((prize, i) => {
+          const level = i + 1;
+          const currentLevel = gameData?.current_level || 0;
+          const cls = level === currentLevel ? 'current' : (level < currentLevel ? 'reached' : '');
+          return (
+            <div key={level} className={`prize-step ${cls}`} title={`Level ${level}: ${prize.toLocaleString('de-DE')}€`}>
+              {prize >= 1000 ? `${prize / 1000}k` : prize}
+            </div>
+          );
+        })}
       </div>
 
       {gameData?.status === 'paused' && (
@@ -828,7 +931,8 @@ const LobbyPage: React.FC = () => {
           {players.map((p, i) => (
             <div
               key={i}
-              className={`teammate-card ${gameData?.game_mode === 'survival' && p.lives === 0 ? 'dead' : ''}`}
+              className={`teammate-card ${gameData?.game_mode === 'survival' && p.lives === 0 ? 'dead' : ''} ${offlineUsers.has(p.userId) ? 'offline' : ''}`}
+              style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center' }}
             >
               {/* Avatar Display */}
               <div className="teammate-avatar">
@@ -850,7 +954,7 @@ const LobbyPage: React.FC = () => {
                 </div>
               )}
 
-              <div className="font-bold">{p.name}</div>
+              <div className="font-bold">{p.name} {offlineUsers.has(p.userId) && <WifiOff size={13} className="offline-icon" />}</div>
               <div>{t('price_money')}: {p.score?.toLocaleString('de-DE')}€</div>
               {gameData?.game_mode === 'survival' && (
                 <div className="lives-row">
