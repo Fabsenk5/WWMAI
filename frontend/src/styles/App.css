@@ -189,11 +189,16 @@ button {
     font-size: 16px;
     font-weight: 600;
     cursor: pointer;
-    background: var(--grad-gold);
-    color: var(--text-inverse);
-    border: none;
+    /* Neutral base: no gradient by default. Gold must be applied explicitly
+       via classes (.button, .btn-primary, .form-submit-btn, .submit-button,
+       .joker-button, .option-button.selected, ...) so component background
+       colors are not covered by the global gradient image. */
+    background-color: var(--bg-card);
+    background-image: none;
+    color: var(--text-primary);
+    border: 1px solid var(--border-strong);
     border-radius: var(--radius-md);
-    box-shadow: var(--shadow-gold);
+    box-shadow: var(--shadow-sm);
     letter-spacing: 0.2px;
     transition: transform var(--transition-fast), box-shadow var(--transition-fast),
         filter var(--transition-fast), background-color var(--transition-fast),
