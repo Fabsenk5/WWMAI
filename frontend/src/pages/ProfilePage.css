@@ -14,6 +14,8 @@
     border-radius: 50%;
     border: 2px solid transparent;
     box-shadow: none;
+    /* the global button gradient must not cover the inline background color */
+    background-image: none;
     display: flex;
     align-items: center;
     justify-content: center;
