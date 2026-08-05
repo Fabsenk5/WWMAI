@@ -64,6 +64,9 @@ export const syncDatabaseSchema = async () => {
         await addColumnIfNotExists('questions', 'embedding', 'REAL[]');
         await addColumnIfNotExists('questions', 'last_used_at', 'TIMESTAMP WITH TIME ZONE');
         await addColumnIfNotExists('questions', 'times_used', 'INT DEFAULT 0');
+        // Legacy DBs (created before the current schema) lack created_at — the
+        // AI pool logic (cooldown, references) requires it
+        await addColumnIfNotExists('questions', 'created_at', 'TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP');
 
         // 1c. Ensure 'rooms' table exists (required by seed.ts)
         await client.query(`
