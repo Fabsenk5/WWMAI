@@ -138,23 +138,33 @@ if (process.env.NODE_ENV !== 'test') {
     // near-duplicates and tops up categories below the pool target)
     const QUESTION_CLEANUP_INTERVAL_MS = 24 * 60 * 60 * 1000;
     setInterval(() => {
-        cleanupSimilarQuestions().catch(err => {
-            console.error('[App] Error during question similarity cleanup:', err);
-        });
-        fillQuestionPools().catch(err => {
-            console.error('[App] Error during question pool fill:', err);
-        });
+        runQuestionMaintenance();
     }, QUESTION_CLEANUP_INTERVAL_MS);
     console.log('[App] Scheduled question pool maintenance (cleanup + fill) to run every 24 hours.');
 
-    // Initial embedding backfill + near-duplicate cleanup shortly after boot —
-    // otherwise similar legacy questions stay active until the first 24h run
+    // Initial maintenance shortly after boot. Render Free cold-starts the
+    // process on every wake-up, so long setInterval jobs may never fire —
+    // running cleanup + fill on boot keeps the pools growing. The 6h per-category
+    // cooldown inside ensureCategoryPool keeps API usage in check.
     setTimeout(() => {
-        cleanupSimilarQuestions().catch(err => {
-            console.error('[App] Initial similarity cleanup failed:', err);
-        });
+        runQuestionMaintenance();
     }, 60 * 1000);
-    console.log('[App] Initial question similarity cleanup scheduled 60s after boot.');
+    console.log('[App] Initial question pool maintenance scheduled 60s after boot.');
+}
+
+// Sequential cleanup -> fill (shared by boot and the 24h interval; keeps RAM
+// usage predictable on the 512MB free tier)
+async function runQuestionMaintenance(): Promise<void> {
+    try {
+        await cleanupSimilarQuestions();
+    } catch (err) {
+        console.error('[App] Question similarity cleanup failed:', err);
+    }
+    try {
+        await fillQuestionPools();
+    } catch (err) {
+        console.error('[App] Question pool fill failed:', err);
+    }
 }
 
 interface JoinRoomPayload {
