@@ -20,7 +20,7 @@ const GamePage: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const { showAlert } = useModal();
   const { user } = useAuth(); // Added useAuth
-  const { playTrack, playSFX, getAudioForLevel, stopAll } = useAudio();
+  const { playTrack, playSFX, playFinalAnswerStinger, getAudioForLevel, stopAll } = useAudio();
   console.log(`[GamePage] Mounted. ID from URL: ${id}`);
 
   const {
@@ -255,9 +255,8 @@ const GamePage: React.FC = () => {
       try {
         await submitAnswer(roomCode, currentQuestion.id.toString(), answer);
         setAnswerSubmitted(true);
-        // Audio: Final Answer
-        const level = currentQuestion.level || 1;
-        playSFX(getAudioForLevel(level, 'final_answer'));
+        // Audio: Final Answer stinger (never overlaps the background loop)
+        playFinalAnswerStinger();
 
         const response = await fetch(`${API_BASE_URL}/api/games/${roomCode}/players`);
         if (response.ok) {

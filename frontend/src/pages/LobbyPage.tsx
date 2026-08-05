@@ -65,7 +65,7 @@ const LobbyPage: React.FC = () => {
   const { gameData, setGameData } = context || {};
 
   const { showModal, showAlert } = useModal();
-  const { playTrack, playSFX, playTick, playClick, getAudioForLevel, stopAll } = useAudio();
+  const { playTrack, playSFX, playTick, playClick, playFinalAnswerStinger, getAudioForLevel, stopAll } = useAudio();
 
   const [players, setPlayers] = useState<User[]>([]);
   const [currentQuestion, setCurrentQuestion] = useState<QuestionPayload | null>(null);
@@ -688,9 +688,8 @@ const LobbyPage: React.FC = () => {
         questionId: currentQuestion.id
       });
       setAnswerSubmitted(true);
-      // Audio: Final Answer
-      const level = currentQuestion.level || 1;
-      playSFX(getAudioForLevel(level, 'final_answer'));
+      // Audio: Final Answer stinger (never overlaps the background loop)
+      playFinalAnswerStinger();
     } catch (error: any) {
       console.error('Error submitting answer:', error);
       const msg = error.response?.data?.error || 'Failed to submit answer';

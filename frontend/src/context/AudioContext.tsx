@@ -12,6 +12,7 @@ interface AudioContextType {
     playSFX: (trackName: string) => void;
     playTick: () => void;
     playClick: () => void;
+    playFinalAnswerStinger: () => void;
     stopAll: () => void;
     getAudioForLevel: (level: number, type: 'question' | 'final_answer' | 'win' | 'lose') => string;
 }
@@ -75,6 +76,38 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     const playTick = useCallback(() => playTone(880, 50, 'square', 0.08), [playTone]);
     const playClick = useCallback(() => playTone(1150, 25, 'square', 0.06), [playTone]);
 
+    // "Final answer" stinger: three rising tones (no asset needed, never
+    // overlaps the background loop)
+    const playFinalAnswerStinger = useCallback(() => {
+        try {
+            if (isMutedRef.current || volumeRef.current <= 0) return;
+            if (!audioCtxRef.current) {
+                const Ctx = window.AudioContext || (window as any).webkitAudioContext;
+                if (!Ctx) return;
+                audioCtxRef.current = new Ctx();
+            }
+            const ctx = audioCtxRef.current;
+            if (ctx.state === 'suspended') ctx.resume();
+            const start = ctx.currentTime;
+            [523.25, 659.25, 783.99].forEach((freq, i) => {
+                const osc = ctx.createOscillator();
+                const g = ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.value = freq;
+                const t = start + i * 0.12;
+                g.gain.setValueAtTime(0.001, t);
+                g.gain.linearRampToValueAtTime(0.25 * volumeRef.current * MASTER_VOLUME, t + 0.02);
+                g.gain.exponentialRampToValueAtTime(0.001, t + 0.3);
+                osc.connect(g);
+                g.connect(ctx.destination);
+                osc.start(t);
+                osc.stop(t + 0.35);
+            });
+        } catch (err) {
+            console.warn('[Audio] Final answer stinger failed:', err);
+        }
+    }, []);
+
     // Initialize audio element
     useEffect(() => {
         // Default startup track
@@ -133,13 +166,25 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
     const playSFX = useCallback((trackName: string) => {
         try {
+            const path = `/assets/audio/${trackName}`;
+
+            // Never play the same file that is already running as the background
+            // loop — otherwise the track overlaps itself (audible "double music").
+            if (audioRef.current && !audioRef.current.paused) {
+                try {
+                    if (audioRef.current.src.endsWith(path)) {
+                        console.log(`[Audio] Skipping SFX ${trackName} — already playing as background track.`);
+                        return;
+                    }
+                } catch { /* src compare failed — play anyway */ }
+            }
+
             // Stop any running SFX first so round sounds never overlap
             sfxRef.current.forEach(a => {
                 try { a.pause(); } catch { /* noop */ }
             });
             sfxRef.current = [];
 
-            const path = `/assets/audio/${trackName}`;
             const audio = new Audio(path);
             audio.loop = false;
             audio.volume = isMutedRef.current ? 0 : (volumeRef.current * MASTER_VOLUME); // Use global volume
@@ -272,7 +317,7 @@ export const AudioProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }, []);
 
     return (
-        <AudioContext.Provider value={{ isPlaying, volume, togglePlay, setVolume, isMuted, toggleMute, currentTrack, playTrack, playSFX, playTick, playClick, stopAll, getAudioForLevel }}>
+        <AudioContext.Provider value={{ isPlaying, volume, togglePlay, setVolume, isMuted, toggleMute, currentTrack, playTrack, playSFX, playTick, playClick, playFinalAnswerStinger, stopAll, getAudioForLevel }}>
             {children}
         </AudioContext.Provider>
     );
