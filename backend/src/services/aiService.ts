@@ -157,11 +157,12 @@ export class AiService {
                 return;
             }
 
-            // 2. Cooldown per category: only generate if the pool is empty or the last
-            //    generated question is older than COOLDOWN_HOURS. Prevents repeated
-            //    similar-fill generations triggered by consecutive game creations.
+            // 2. Cooldown per category: only generate if the last ACTIVE question
+            //    is older than COOLDOWN_HOURS. A category with zero ACTIVE
+            //    questions (e.g. fully deactivated by the similarity cleanup)
+            //    must generate immediately — otherwise it stays unplayable.
             const lastGenRes = await this.db.query(
-                `SELECT MAX(created_at) AS last FROM questions WHERE category = $1`,
+                `SELECT MAX(created_at) AS last FROM questions WHERE category = $1 AND is_active = true`,
                 [category]
             );
             const lastGenAt = lastGenRes.rows[0]?.last ? new Date(lastGenRes.rows[0].last) : null;
