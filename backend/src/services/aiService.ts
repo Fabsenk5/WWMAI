@@ -36,7 +36,9 @@ export class AiService {
     private static readonly COOLDOWN_HOURS = 6; // min hours between generations per category
     private static readonly MAX_ATTEMPTS = 4;      // initial try + retries on the configured model
     private static readonly RETRY_DELAY_MS = 5000; // pause between attempts
-    private static readonly FETCH_TIMEOUT_MS = 120 * 1000;
+    // 50-question batches with translations can take several minutes on the
+    // endpoint — keep the timeout generous so it doesn't abort healthy requests
+    private static readonly FETCH_TIMEOUT_MS = 240 * 1000;
 
     constructor(dbPool: Pool) {
         this.db = dbPool;
