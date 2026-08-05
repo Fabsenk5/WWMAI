@@ -529,4 +529,34 @@ export class AdminController {
 
         res.json({ success: true, message: 'Similarity cleanup started in background.' });
     }
+
+    /**
+     * Run the full pool maintenance on demand — the same as the boot/24h job:
+     * similarity cleanup (backfill + deactivate) followed by filling every
+     * category below the pool target (6h cooldown per category still applies).
+     */
+    runPoolMaintenance = async (req: Request, res: Response) => {
+        const { password } = req.body;
+        if (password !== this.adminPassword) {
+            res.status(401).json({ error: 'Unauthorized: Invalid password' });
+            return;
+        }
+
+        (async () => {
+            try {
+                const cleanup = await import('../database/cleanupSimilarQuestions');
+                await cleanup.cleanupSimilarQuestions();
+            } catch (err) {
+                console.error('[AdminController] Cleanup step failed:', err);
+            }
+            try {
+                const fill = await import('../database/fillQuestionPools');
+                await fill.fillQuestionPools();
+            } catch (err) {
+                console.error('[AdminController] Fill step failed:', err);
+            }
+        })();
+
+        res.json({ success: true, message: 'Pool maintenance (cleanup + fill) started in background.' });
+    }
 }

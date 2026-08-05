@@ -14,6 +14,7 @@ import {
     updateCategoryStatus,
     fillCategoryPool,
     runSimilarityCleanup,
+    runPoolMaintenance,
     updateAllQuestionsStatus,
     regenerateQuestions,
     updateQuestionDifficulty,
@@ -322,6 +323,16 @@ const AdminDashboard: React.FC = () => {
         }
     };
 
+    const handlePoolMaintenance = async () => {
+        try {
+            const result = await runPoolMaintenance(adminPassword);
+            setSettingsMessage(result.message || 'Pool maintenance started');
+            setTimeout(() => setSettingsMessage(''), 5000);
+        } catch (error) {
+            setSettingsMessage('Error starting maintenance');
+        }
+    };
+
     return (
         <div className="admin-dashboard-container">
             <div className="admin-header">
@@ -378,6 +389,12 @@ const AdminDashboard: React.FC = () => {
                     onClick={handleSimilarityCleanup}
                 >
                     <RefreshCw size={14} /> Similarity Cleanup
+                </button>
+                <button
+                    className="btn btn-primary"
+                    onClick={handlePoolMaintenance}
+                >
+                    <RefreshCw size={14} /> Fill All Pools
                 </button>
                 <button
                     className="btn btn-danger"
