@@ -270,6 +270,8 @@ const GamePage: React.FC = () => {
     }
   };
 
+  const startRetryCountRef = useRef(0);
+
   const startGame = async () => {
     if (roomCode) {
       try {
@@ -283,10 +285,25 @@ const GamePage: React.FC = () => {
           },
           body: JSON.stringify({ userId: user ? String(user.id) : userId }),
         });
+        const data = await response.json().catch(() => ({}));
+        if (data.error === 'questions_generating') {
+          // Pool is being generated — auto-retry until questions are ready
+          if (startRetryCountRef.current < 10) {
+            startRetryCountRef.current += 1;
+            showAlert(data.message || 'Fragen werden generiert — bitte kurz warten...', 'Bitte warten');
+            setTimeout(() => { startGame(); }, 20000);
+          } else {
+            showAlert('Die Fragen konnten nicht generiert werden. Bitte später erneut versuchen.', 'Fehler');
+            startRetryCountRef.current = 0;
+          }
+          return;
+        }
         if (response.ok) {
-          const data = await response.json();
           setCurrentQuestion(data.firstQuestion);
           if (setGameData) setGameData(prev => prev ? ({ ...prev, status: 'started', current_level: 1 }) : null);
+          startRetryCountRef.current = 0;
+        } else {
+          showAlert(data.error || 'Error starting game', 'Error');
         }
       } catch (err) {
         console.error('Error starting game:', err);

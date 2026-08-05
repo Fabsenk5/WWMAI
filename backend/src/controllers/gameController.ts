@@ -715,8 +715,30 @@ export class GameController {
         }
     }
 
+    // Start gate: explicitly selected categories must have at least one active
+    // question. Empty (new) categories trigger background generation and the
+    // game waits instead of starting with foreign/no questions.
+    private async categoriesReady(selectedCategories: string[] | null, roomCode: string | null): Promise<boolean> {
+        if (!selectedCategories || selectedCategories.length === 0) return true;
+
+        const res = await this.db.query(
+            `SELECT COUNT(*) AS cnt FROM questions WHERE category = ANY($1) AND is_active = true`,
+            [selectedCategories]
+        );
+        const count = parseInt(res.rows[0].cnt, 10);
+        if (count > 0) return true;
+
+        console.log(`[StartGate] Selected categories have no active questions: ${selectedCategories.join(', ')}${roomCode ? ` (room ${roomCode})` : ''}. Triggering generation.`);
+        selectedCategories.forEach(category => {
+            this.aiService.ensureCategoryPool(category, 50).catch(err => {
+                console.error(`[StartGate] Background pool check failed for "${category}":`, err);
+            });
+        });
+        return false;
+    }
+
     // Helper for Auto-Start
-    private async tryAutoStart(roomCode: string): Promise<void> {
+    private async tryAutoStart(roomCode: string, retryCount: number = 0): Promise<void> {
         try {
             const gameCheckQuery = 'SELECT game_id, status, selected_categories, difficulty_mode, player_count, lives, wait_time FROM games WHERE room_code = $1';
             const gameCheckResult = await this.db.query(gameCheckQuery, [roomCode]);
@@ -724,6 +746,20 @@ export class GameController {
             if (gameCheckResult.rows.length === 0) return;
             const game = gameCheckResult.rows[0];
             if (game.status !== 'pending') return;
+
+            // Start gate: explicit categories with zero active questions must be
+            // filled first — otherwise the round starts with foreign/no questions.
+            if (!(await this.categoriesReady(game.selected_categories, roomCode))) {
+                console.log(`[AutoStart] Category pool for ${roomCode} still empty — retrying in 20s (${retryCount}/15).`);
+                if (retryCount < 15) {
+                    setTimeout(() => {
+                        this.tryAutoStart(roomCode, retryCount + 1).catch(err => {
+                            console.error('[AutoStart] Retry failed:', err);
+                        });
+                    }, 20000);
+                }
+                return;
+            }
 
             const categories = game.selected_categories || null;
             const difficultyMode = game.difficulty_mode || 'standard';
@@ -831,6 +867,16 @@ export class GameController {
                 res.status(409).json({
                     error: `Game cannot be started. Current status: ${game.status}`,
                     currentStatus: game.status
+                });
+                return;
+            }
+
+            // Start gate: wait for empty (new) categories to be filled first
+            if (!(await this.categoriesReady(game.selected_categories, roomCode))) {
+                await client.query('ROLLBACK');
+                res.status(409).json({
+                    error: 'questions_generating',
+                    message: 'Fragen werden generiert — bitte in ca. 2 Minuten erneut starten.',
                 });
                 return;
             }
@@ -1417,6 +1463,13 @@ export class GameController {
             const stored5050Removals: string[] = game_mode === 'cooperative'
                 ? (team_5050_removed || [])
                 : player5050Removals;
+
+            // Question-switch is a team-only joker: in survival it would desync
+            // the shared question between players with individual joker sets
+            if (jokerType === 'switch' && game_mode !== 'cooperative') {
+                res.status(403).json({ error: 'Der Frage-Tausch ist nur im Team-Modus verfügbar.' });
+                return;
+            }
 
             // Fetch Question Data
             const questionQuery = `SELECT * FROM questions WHERE id = $1`;

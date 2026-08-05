@@ -337,10 +337,14 @@ const LobbyPage: React.FC = () => {
         let result: 'victory' | 'defeat' = 'defeat';
 
         if (data.gameMode === 'survival') {
-          // Survival: Victory if Level 15 reached AND (I am alive OR I just answered correctly)
-          // Actually, if gameEnded=true at level 15, it implies the game was beaten.
-          // Let's trust the level.
-          if (data.currentLevel >= 15) {
+          // Survival: victory only if the player themselves is still alive
+          const myName = getSafeStorage('userName');
+          const myUserId = getSafeStorage('userId');
+          const myResult = data.playerAnswers.find(p =>
+            (myUserId && (p as any).userId === myUserId) || p.name === myName
+          );
+          const iAmAlive = myResult ? (myResult as any).lives > 0 : true;
+          if (data.currentLevel >= 15 && iAmAlive) {
             result = 'victory';
           }
         } else {
@@ -615,6 +619,8 @@ const LobbyPage: React.FC = () => {
   // Need to merge logic. Let's redefine main function body properly.
 
 
+  const startRetryCountRef = useRef(0);
+
   const handleStartGame = async () => {
     if (!roomCode) return;
     try {
@@ -627,10 +633,24 @@ const LobbyPage: React.FC = () => {
         },
         body: JSON.stringify({ userId: user ? String(user.id) : getSafeStorage('userId') }),
       });
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        showAlert(data.error || 'Failed to start game', 'Error');
+      const data = await res.json().catch(() => ({}));
+      if (data.error === 'questions_generating') {
+        // Pool is being generated — auto-retry until questions are ready
+        if (startRetryCountRef.current < 10) {
+          startRetryCountRef.current += 1;
+          showAlert(data.message || 'Fragen werden generiert — bitte kurz warten...', 'Bitte warten');
+          setTimeout(() => { handleStartGame(); }, 20000);
+        } else {
+          showAlert('Die Fragen konnten nicht generiert werden. Bitte später erneut versuchen.', 'Fehler');
+          startRetryCountRef.current = 0;
+        }
+        return;
       }
+      if (!res.ok) {
+        showAlert(data.error || 'Failed to start game', 'Error');
+        return;
+      }
+      startRetryCountRef.current = 0;
     } catch (err) {
       console.error('Failed to start game:', err);
       showAlert('Failed to start game', 'Error');
@@ -756,7 +776,7 @@ const LobbyPage: React.FC = () => {
 
       {waitingForCount && !revealedAnswers && (
         <div className="waiting-message">
-          {t('waiting_teammates')} ({waitingForCount.count} / {waitingForCount.total})
+          {gameData?.game_mode === 'survival' ? t('waiting_for_players') : t('waiting_teammates')} ({waitingForCount.count} / {waitingForCount.total})
         </div>
       )}
 
@@ -934,7 +954,7 @@ const LobbyPage: React.FC = () => {
               { type: '5050', label: '50:50', Icon: Split },
               { type: 'audience', label: t('joker_audience'), Icon: Users },
               { type: 'phone', label: t('joker_phone'), Icon: Phone },
-              { type: 'switch', label: t('joker_switch'), Icon: RefreshCw }
+              ...(isSurvival ? [] : [{ type: 'switch', label: t('joker_switch'), Icon: RefreshCw }])
             ];
 
             return (
