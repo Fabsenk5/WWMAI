@@ -1,4 +1,4 @@
-import { Pool } from 'pg';
+﻿import { Pool } from 'pg';
 import dotenv from 'dotenv';
 import path from 'path';
 
@@ -30,19 +30,24 @@ interface ChatMessage {
 export class AiService {
     private apiKey: string | null = null;
     private baseURL: string;
-    private modelCandidates: string[];
+    private model: string;
     private db: Pool;
     private generationLocks: Map<string, boolean> = new Map(); // per-category in-flight guard
     private static readonly COOLDOWN_HOURS = 6; // min hours between generations per category
+    private static readonly MAX_ATTEMPTS = 4;      // initial try + retries on the configured model
+    private static readonly RETRY_DELAY_MS = 5000; // pause between attempts
+    private static readonly FETCH_TIMEOUT_MS = 120 * 1000;
 
     constructor(dbPool: Pool) {
         this.db = dbPool;
         this.apiKey = process.env.DEEPSEEK_API_KEY || null;
         this.baseURL = (process.env.DEEPSEEK_BASE_URL || DEFAULT_BASE_URL).replace(/\/+$/, '');
-        const primaryModel = process.env.DEEPSEEK_MODEL || DEFAULT_MODEL;
-        this.modelCandidates = [primaryModel, DEFAULT_MODEL, 'deepseek-chat'];
+        // Stay on the configured model only â€” fallback models are not supported
+        // by the endpoint (deepseek-chat â†’ 401) and network blips are handled
+        // by retrying the primary model with a pause instead.
+        this.model = process.env.DEEPSEEK_MODEL || DEFAULT_MODEL;
         if (this.apiKey) {
-            console.log(`[AiService] Initialized with DeepSeek-compatible API (base: ${this.baseURL}, model: ${primaryModel})`);
+            console.log(`[AiService] Initialized with DeepSeek-compatible API (base: ${this.baseURL}, model: ${this.model})`);
         } else {
             console.warn('[AiService] DEEPSEEK_API_KEY not found. AI generation will be disabled.');
         }
@@ -59,14 +64,23 @@ export class AiService {
             body.response_format = { type: 'json_object' };
         }
 
-        const res = await fetch(`${this.baseURL}/chat/completions`, {
-            method: 'POST',
-            headers: {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${this.apiKey}`,
-            },
-            body: JSON.stringify(body),
-        });
+        // Hard timeout so a hanging request fails fast and the retry can kick in
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), AiService.FETCH_TIMEOUT_MS);
+        let res: Response;
+        try {
+            res = await fetch(`${this.baseURL}/chat/completions`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${this.apiKey}`,
+                },
+                body: JSON.stringify(body),
+                signal: controller.signal,
+            });
+        } finally {
+            clearTimeout(timeout);
+        }
 
         if (!res.ok) {
             const errText = await res.text().catch(() => '');
@@ -81,37 +95,33 @@ export class AiService {
         return content;
     }
 
-    private async generateWithFallback(messages: ChatMessage[], options: { json?: boolean; maxTokens?: number } = {}): Promise<string> {
+    private async generateWithRetry(messages: ChatMessage[], options: { json?: boolean; maxTokens?: number } = {}): Promise<string> {
         let lastError: any = null;
 
-        for (let modelIndex = 0; modelIndex < this.modelCandidates.length; modelIndex++) {
-            const model = this.modelCandidates[modelIndex];
-            const isMainModel = modelIndex === 0;
-            const retriesToAttempt = isMainModel ? 2 : 1;
+        for (let attempt = 0; attempt < AiService.MAX_ATTEMPTS; attempt++) {
+            try {
+                const content = await this.chatCompletion({ model: this.model, messages, ...options });
+                console.log(`[AiService] âœ… Successfully generated content using "${this.model}"${attempt > 0 ? ` (retry ${attempt})` : ''}`);
+                return content;
+            } catch (err: any) {
+                lastError = err;
+                // 4xx client errors (bad model, invalid key, ...) are not retriable;
+                // network failures ("fetch failed", timeouts), 429 and 5xx are.
+                const notRetriable = err.message
+                    && (err.message.includes('AI API error 400')
+                        || err.message.includes('AI API error 401')
+                        || err.message.includes('AI API error 403')
+                        || err.message.includes('AI API error 404'));
+                console.warn(`[AiService] Model "${this.model}" failed${attempt > 0 ? ` (retry ${attempt})` : ''}: ${err.message}`);
 
-            for (let attempt = 0; attempt < retriesToAttempt; attempt++) {
-                try {
-                    const content = await this.chatCompletion({ model, messages, ...options });
-                    console.log(`[AiService] ✅ Successfully generated content using "${model}"${attempt > 0 ? ` (retry ${attempt})` : ''}`);
-                    return content;
-                } catch (err: any) {
-                    lastError = err;
-                    const retriable = err.message
-                        && (err.message.includes('503') || err.message.includes('429')
-                            || err.message.includes('overloaded') || err.message.includes('Internal server error'));
-                    console.warn(`[AiService] Model "${model}" failed${attempt > 0 ? ` (retry ${attempt})` : ''}: ${err.message}`);
-
-                    if (!retriable) {
-                        break; // Move to the next model
-                    }
-                    if (attempt < retriesToAttempt - 1) {
-                        await new Promise(resolve => setTimeout(resolve, 1000));
-                    }
+                if (notRetriable || attempt >= AiService.MAX_ATTEMPTS - 1) {
+                    break;
                 }
+                await new Promise(resolve => setTimeout(resolve, AiService.RETRY_DELAY_MS));
             }
         }
 
-        throw lastError || new Error('All AI models failed.');
+        throw lastError || new Error('All AI attempts failed.');
     }
 
     private cleanJsonText(text: string): string {
@@ -160,7 +170,7 @@ export class AiService {
             // 2. Cooldown per category: only generate if the last ACTIVE question
             //    is older than COOLDOWN_HOURS. A category with zero ACTIVE
             //    questions (e.g. fully deactivated by the similarity cleanup)
-            //    must generate immediately — otherwise it stays unplayable.
+            //    must generate immediately â€” otherwise it stays unplayable.
             const lastGenRes = await this.db.query(
                 `SELECT MAX(created_at) AS last FROM questions WHERE category = $1 AND is_active = true`,
                 [category]
@@ -186,7 +196,7 @@ export class AiService {
             // 4. Determine amount to generate (larger batches fill the pool faster and
             //    reduce repeated near-identical generations)
             const amountToGenerate = Math.min(gap, 50);
-            console.log(`[AiService] 🤖 Starting background generation for "${category}". Target: ${amountToGenerate} new questions.`);
+            console.log(`[AiService] ðŸ¤– Starting background generation for "${category}". Target: ${amountToGenerate} new questions.`);
 
             // 5. Calculate difficulty distribution dynamically
             const easyCount = Math.ceil(amountToGenerate * 0.25);
@@ -266,7 +276,7 @@ ${existingQuestions.map((q, i) =>
                 }
             `;
 
-            const responseText = await this.generateWithFallback(
+            const responseText = await this.generateWithRetry(
                 [
                     { role: 'system', content: 'You are a trivia question generator. You always respond with valid JSON only.' },
                     { role: 'user', content: prompt },
@@ -366,10 +376,10 @@ ${existingQuestions.map((q, i) =>
                 gateExisting.push({ id: null, question: q.question, correct_answer: q.correct_answer, embedding });
             }
 
-            console.log(`[AiService] ✅ Successfully processed category: "${category}". New questions inserted: ${insertedCount}, rejected: ${rejectedCount}.`);
+            console.log(`[AiService] âœ… Successfully processed category: "${category}". New questions inserted: ${insertedCount}, rejected: ${rejectedCount}.`);
 
         } catch (error) {
-            console.error(`[AiService] ❌ Error ensuring pool for category "${category}":`, error);
+            console.error(`[AiService] âŒ Error ensuring pool for category "${category}":`, error);
         }
     }
 
@@ -425,7 +435,7 @@ ${existingQuestions.map((q, i) =>
                 `;
 
                 try {
-                    const responseText = await this.generateWithFallback(
+                    const responseText = await this.generateWithRetry(
                         [
                             { role: 'system', content: 'You are a translation engine. You always respond with valid JSON only.' },
                             { role: 'user', content: prompt },
